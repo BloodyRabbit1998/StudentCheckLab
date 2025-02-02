@@ -51,3 +51,7 @@ async def create_db():
         #if input(":::Удалить БД?::: (y/n): ") == "y":
         #    await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(create_db())
+    
