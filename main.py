@@ -1,6 +1,6 @@
 import asyncio
 import logging
-import models
+import DataBase.models as models
 from aiogram import Bot, Dispatcher
 from aiogram.enums.parse_mode import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -10,7 +10,6 @@ from handlers.admin_panel import router as admin_router
  
 async def main():
     await models.create_db()
-    
     bot = Bot(token=config.BOT_TOKEN,parse_mode=ParseMode.HTML)
     dp=Dispatcher(storege=MemoryStorage())
     dp.include_routers(student_router,admin_router)
