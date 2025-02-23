@@ -24,9 +24,8 @@ kb_admin_main=ReplyKeyboardMarkup(keyboard=[
                                 [ KeyboardButton(text="Список услуг 🧾")]],
                                 resize_keyboard=True)                    
 kb_student_main=ReplyKeyboardMarkup(keyboard=[
-                                [KeyboardButton(text="Сдать работу🧾"), KeyboardButton(text="Список работ 🧾")],
-                                [ KeyboardButton(text="Список услуг 🧾"), KeyboardButton(text="Список услуг 🧾")],
-                                [ KeyboardButton(text="Список услуг 🧾")]],
+                                [KeyboardButton(text="Сдать работу🧾"), KeyboardButton(text="Список моих работ")],
+                                [ KeyboardButton(text="Получить работу👁‍🗨")]],
                                 resize_keyboard=True)
 kb_admin_works=ReplyKeyboardMarkup(keyboard=[
                                 [KeyboardButton(text="Добавить работу"),KeyboardButton(text="Просмотреть работы")],
@@ -63,5 +62,6 @@ async def kb_return_group(call_text:str):
     return kb
 async def kb_return_disciplin_id(call_text:str,id_student:int):
     student=await db.return_student(id_student)
-    kb=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=student.name, callback_data=f"{call_text} {student.id}")] for student in await db.return_discipline("student",student[-1].id_group)])
+    kb=InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=student.name, callback_data=f"{call_text} {student.id}")] for student in await db.return_discipline("",id_group=student[-1].id_group)])
     return kb

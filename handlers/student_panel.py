@@ -1,5 +1,6 @@
 from aiogram import types, F, Router,Bot
 from aiogram.types import Message
+from aiogram.types.input_file import FSInputFile
 from aiogram.filters import Command,CommandStart
 from aiogram.fsm.context import FSMContext 
 from states import *
@@ -50,7 +51,8 @@ async def registration(msg:Message,state:FSMContext):
     await state.set_state(Student.choice_Name)
 @router.message(F.text=="Сдать работу🧾")
 async def send_work(msg:Message, state:FSMContext):
-    await msg.answer("Выберите дисциплину:",reply_markup=await kb_return_discipline("discipline sel student"))
+    await state.clear()
+    await msg.answer("Выберите дисциплину:",reply_markup=await kb_return_disciplin_id("discipline sel student",msg.from_user.id))
     await state.set_state(AddWork.choice_discipline)
 @router.callback_query(F.data.regexp(r"discipline sel student \d+"),AddWork.choice_discipline)
 async def callback_discipline(call:types.CallbackQuery, state:FSMContext):
@@ -62,8 +64,12 @@ async def callback_discipline(call:types.CallbackQuery, state:FSMContext):
 async def callback_discipline(call:types.CallbackQuery, state:FSMContext):
     work_id=int(call.data.split()[-1])
     await state.update_data(work_id=work_id)
-    await call.message.answer("Отправьте файл:", reply_markup=ReplyKeyboardRemove())
+    await call.message.answer("Отправьте файл:", reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton("Отменить отправку❌")]]))
     await state.set_state(AddWork.document)
+@router.message(AddWork.document, F.text.in_(["Отменить отправку❌"]))
+async def cancel_send(msg:Message, state:FSMContext):
+    await msg.answer("Отменено!", reply_markup=kb_student_main)
+    await state.clear()
 @router.message(AddWork.document, F.document)
 async def add_document(msg:Message,state:FSMContext,bot:Bot):
     data=await state.get_data()
@@ -81,3 +87,26 @@ async def add_document(msg:Message,state:FSMContext,bot:Bot):
     await msg.answer("Работа отправлена!")
     await menu(msg)
     await state.clear()
+@router.message(F.text=="Получить работу👁‍🗨")
+async def get_work(msg:Message, state:FSMContext):
+    await state.clear()
+    await msg.answer("Выберите дисциплину:", reply_markup=await kb_return_disciplin_id("discipline sel get work",msg.from_user.id))
+    await state.set_state(AddWork.choice_discipline)
+
+@router.callback_query(F.data.regexp(r"discipline sel get work \d+"),AddWork.choice_discipline)
+async def callback_discipline(call:types.CallbackQuery, state:FSMContext):
+    discipline_id=int(call.data.split()[-1])
+    await state.update_data(discipline_id=discipline_id)
+    await call.message.answer("Выберите работу:", reply_markup=await kb_return_works(discipline_id, "student get work"))
+    await state.set_state(AddWork.choice_work)
+@router.callback_query(F.data.regexp(r"student get work \d+"), AddWork.choice_work)
+async def callback_document(call:types.CallbackQuery, state:FSMContext,bot:Bot):
+    work_id=int(call.data.split()[-1])
+    await state.update_data(work_id=work_id)
+    data=await state.get_data()
+    work=await db.return_work(data['work_id'])
+    file_input = FSInputFile(work[-1].path)
+    await bot.send_document(
+        call.message.chat.id, file_input,
+        caption=f'{work[-1].name}')
+
