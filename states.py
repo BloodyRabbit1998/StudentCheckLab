@@ -4,7 +4,13 @@ class Student(StatesGroup):
     choice_Name=State()
     choice_Group=State()
 
-class Lab(StatesGroup):
-    choice_semester=State()
+class Table(StatesGroup):
+    choice_table=State()
+    choice_operation=State()
+    set_data=State()
+    repite=State()
+    document=State()
+class AddWork(StatesGroup):
     choice_discipline=State()
-    choice_number_state=State()
+    choice_work=State()
+    document=State()

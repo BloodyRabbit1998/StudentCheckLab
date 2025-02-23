@@ -1,11 +1,5 @@
 from .models import *
-from sqlalchemy import select
-from datetime import datetime
-
-def f_date(date:str):
-    return datetime.strptime(date,"%d-%m-%Y")
-def f_time(time:str):
-    return datetime.strptime(time,"%H:%M")
+from sqlalchemy import select,update,delete
 
 async def return_group(col:int|str):
     async with SESSION() as db: 
@@ -14,8 +8,9 @@ async def return_group(col:int|str):
         else:
             stmt=select(Group).where(Group.name==col)
         cols=await db.scalars(stmt)
-    logging.DEBUG(cols)
-    return [col for col in cols]
+    logging.debug(cols)
+    cols=[col for col in cols]
+    return cols[-1] if cols else None
 
 async def return_student(col:int|str):
     async with SESSION() as db: 
@@ -24,24 +19,35 @@ async def return_student(col:int|str):
         else:
             stmt=select(Student).where(Student.name==col)
         cols=await db.scalars(stmt)
-    logging.DEBUG(cols)
+    logging.debug(cols)
     return [col for col in cols]
 
-async def return_discipline(col:int|str):
-    async with SESSION() as db:    
+async def return_discipline(col:int|str,**kwargs):
+    if kwargs:
+        if "id_group" in kwargs:
+            stmt=select(Discipline).where(Discipline.id_group==kwargs["id_group"])
+    else:
         if type(col)==int:
             stmt=select(Discipline).where(Discipline.id==col)
         else:
             stmt=select(Discipline).where(Discipline.name==col)
+    async with SESSION() as db:
         cols=await db.scalars(stmt)
-    logging.DEBUG(cols)
+    logging.debug(cols)
     return [col for col in cols]
 
-async def return_work(id:int):
-    async with SESSION() as db:
+async def return_work(id:int,**kwargs):
+    if kwargs:
+        if "id_discipline" in kwargs:
+            stmt=select(Works).where(Works.id_discipline==kwargs["id_discipline"])
+        elif "name" in kwargs:
+            stmt=select(Works).where(Works.name==kwargs["name"])
+    else:
         stmt=select(Works).where(Works.id==id)
+            
+    async with SESSION() as db:
         cols=await db.scalars(stmt)
-    logging.DEBUG(cols)
+    logging.debug(cols)
     return [col for col in cols]
 async def return_works_student(col:int|Student):
     async with SESSION() as db:
@@ -50,25 +56,32 @@ async def return_works_student(col:int|Student):
         else:
             stmt=select(WorksStudent).where(WorksStudent.id_student==Student.telegram_id)
         cols=await db.scalars(stmt)
-    logging.DEBUG(cols)
+    logging.debug(cols)
     return [col for col in cols]
 async def check_work(id_student:int,id_work:int):
     async with SESSION() as db:
         stmt=select(WorksStudent).where(WorksStudent.id_student==id_student and WorksStudent.id_work==id_work)
         cols=await db.scalars(stmt)
-    logging.DEBUG(cols)
+    logging.debug(cols)
     return [col for col in cols]
 
 async def add(table:str,data:list[tuple]):  
+    """
+    Group: id,name,yeat_study
+    Student: telegram_id,name,id_group
+    Discipline: name,id_group
+    Works: name,id_discipline
+    WorksStudent: id_student,id_work,date_of_delivery,path,accept
+    """
     cols=[]
     if table=="student":               
-            cols=[Student(telegram_id=telegram_id,name=name,id_group=id_group,year_study=year_study) for telegram_id,name,id_group,year_study in data if not await return_student(telegram_id)]
+            cols=[Student(telegram_id=telegram_id,name=name,id_group=id_group) for telegram_id,name,id_group in data if not await return_student(telegram_id)]
     elif table=="group":
         cols=[Group(name=name) for name in data if not await return_group(name)]
     elif table=="discipline":
         cols=[Discipline(name=name,id_group=id_group) for name,id_group in data if not await return_discipline(name)]
     elif table=="works":
-        cols=[Works(id_discipline=id_discipline,name=name) for name,id_discipline in data if not await return_work(name)]
+        cols=[Works(id_discipline=id_discipline,name=name,path=path) for name,id_discipline,path in data]
     elif table=="works_student":
         cols=[]
         for id_student,id_work,date_of_delivery,path,accept in data:
@@ -82,62 +95,80 @@ async def add(table:str,data:list[tuple]):
             db.add_all(cols)
             await db.commit()
     return cols
-async def delete(table:str,ids:list[tuple]):
-    cols=[]
+async def delete_col(table:str,ids:int|list[int]):
     if table=="student":
-        cols=[await return_student(telegram_id) for telegram_id in ids]
+        if type(ids)==int:
+            stmts=[delete(Student).where(Student.id==ids)]  
+        else: 
+            stmts=[delete(Student).where(Student.id==id) for id in ids]
     elif table=="group":
-        cols=[await return_group(id) for id in ids]
+        if type(ids)==int:
+            stmts=[delete(Group).where(Group.id==ids)]   
+        else: 
+            stmts=[delete(Group).where(Group.id==id) for id in ids]
     elif table=="discipline":
-        cols=[await return_discipline(id) for id in ids]
+        if type(ids)==int:
+            stmts=[delete(Discipline).where(Discipline.id==ids)]   
+        else: 
+            stmts=[delete(Discipline).where(Discipline.id==id) for id in ids]
     elif table=="works":
-        cols=[await return_work(id) for id in ids]
+        if type(ids)==int:
+            stmts=[delete(Works).where(Works.id==ids)]  
+        else: 
+            stmts=[delete(Works).where(Works.id==id) for id in ids]
     elif table=="works_student":
-        cols=[await return_works_student(id) for id in ids]
+        if type(ids)==int:
+            stmts=[delete(WorksStudent).where(WorksStudent.id==ids)]   
+        else:
+            stmts=[delete(WorksStudent).where(WorksStudent.id==id) for id in ids]
     async with SESSION() as db:
-        if cols:
-            db.delete(cols)
+        for stmt in stmts:
+            db.execute(stmt) 
             await db.commit()
-    return cols
-async def update(table:str,data:list[tuple]):
+async def update_col(table:str,data:tuple):
+    """
+    Group: id,name
+    Student: id,telegram_id,name,id_group
+    Discipline:id, name,id_group
+    Works: id,name,id_discipline
+    WorksStudent: id,id_student,id_work,date_of_delivery,path,accept
+    """
     cols=[]
     if table=="student":
-        cols=[await return_student(telegram_id) for telegram_id,_,_,_, in data]
-        for student,data in zip(cols,data):
-            if student.name != data[1]      : student.name=data[1] 
-            if student.id_group!=data[2]    : student.id_group=data[2]    
-            if student.year_study!=data[3]  : student.year_study=data[3]
-
+        id,telegram_id,name,id_group=data
+        stmt=update(Student).where(Student.id==id).values(telegram_id=telegram_id,name=name,id_group=id_group)
     elif table=="group":
-        cols=[await return_group(id) for id,_ in data]
-        for group,data in zip(cols,data):
-            if group.name!=data[1]          : group.name=data[1]
+        id,name=data
+        stmt=update(Group).where(Group.id==id).values(name=name)
     elif table=="discipline":
-        cols=[await return_discipline(id) for id in data]
-        for discipline,data in zip(cols,data):
-            if discipline.name!=data[1]     : discipline.name=data[1]
-            if discipline.id_group!=data[2] : discipline.id_group=data[2]
+        id,name,id_group=data
+        stmt=update(Discipline).where(Discipline.id==id).values(name=name, id_group=id_group)
     elif table=="works":
-        cols=[await return_work(id) for id in data]
-        for work,data in zip(cols,data):
-            if work.name!=data[1]           : work.name=data[1]
-            if work.id_discipline!=data[2]  : work.id_discipline=data[2]   
+        id,name,id_discipline,path=data
+        stmt=update(Works).where(Works.id==id).values(name=name, id_discipline=id_discipline, path=path)
     elif table=="works_student":
-        cols=[await return_works_student(id) for id in data]
-        for work_student,data in zip(cols,data):
-            if work_student.id_student!=data[1]         : work_student.id_student=data[1]
-            if work_student.id_work!=data[2]            : work_student.id_work=data[2]
-            if work_student.date_of_delivery!=data[3]   : work_student.date_of_delivery=data[3]
-            if work_student.path!=data[4]               : work_student.path=data[4]
-            if work_student.accept!=data[5]             : work_student.accept=data[5]
+        stmt=update(WorksStudent).where(WorksStudent.id==data[0]).values(id_student=data[1],id_work=data[2],date_of_delivery=data[3],path=data[4],accept=data[5])
     else:
         logging.INFO("Такой таблицы не существует!")
     async with SESSION() as db:
-        if cols:
             logging.debug(cols)
+            await db.execute(stmt)
             logging.info("Обновлен!")
             await db.commit()
-    return cols
+async def return_all(table:str):
+    if table=="student":
+        stmt=select(Student)
+    elif table=="group":
+        stmt=select(Group)
+    elif table=="discipline":
+        stmt=select(Discipline)
+    elif table=="works":
+        stmt=select(Works)
+    elif table=="works_student":
+        stmt=select(WorksStudent)
+    async with SESSION() as db:
+        return await db.scalars(stmt)
+
 if __name__=="__main__":
     with SESSION() as db:
         print(db.query(Student).all())

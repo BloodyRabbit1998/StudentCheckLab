@@ -1,0 +1,316 @@
+from aiogram.types import ( InlineKeyboardButton, 
+                            InlineKeyboardMarkup, 
+                            KeyboardButton, 
+                            ReplyKeyboardMarkup, 
+                            ReplyKeyboardRemove,
+                            )
+from aiogram import F, Router, types,Bot
+from aiogram.types import Message
+from aiogram.filters import Command,CommandStart,BaseFilter
+from config import ADMINS
+import DataBase.request as db
+from aiogram.fsm.context import FSMContext 
+from states import *
+from pathlib import Path
+from .keyboard import *
+
+router=Router()
+edit_table=False
+
+class AdminFilter(BaseFilter):
+    def __init__(self):
+        super().__init__()
+
+    async def __call__(self, message: Message) -> bool:
+        result=message.from_user.id in ADMINS
+        return result
+@router.message(AdminFilter(),CommandStart())
+@router.message(Command('start'),AdminFilter())
+async def start_handler(msg:Message,state:FSMContext):
+    await msg.answer_sticker(r"CAACAgQAAxkBAAED3Q1l5EuHETdkCgz_OEPKmjcPJXwyxQACAwYAAgtetBq169NzfwFttTQE")#,reply_markup=kb)
+    await msg.answer(f"Вы админ",reply_markup=kb_admin_main) 
+    await msg.answer(msg_admin_start)  
+@router.message(Command('menu'))
+@router.message(F.text=="menu", AdminFilter())
+async def menu(msg:Message):
+    if str(msg.from_user.id) in ADMINS:
+        global edit_table
+        await msg.answer(f"Админ панель",reply_markup=kb_admin_main) 
+        edit_table=False
+    else:
+        await msg.answer("Меню",reply_markup=kb_student_main) 
+@router.message(Command('id'))
+@router.message(F.text=="id")
+async def massage_id(msg:Message):
+    await msg.answer(f"Ваш ID: {msg.from_user.id}")
+
+@router.message(Command('status'))
+@router.message(F.text=="status")
+async def massage_status(msg:Message):
+    if str(msg.from_user.id) in ADMINS:
+        await msg.answer(f"Вы админ")
+        await msg.answer(msg_admin_start)   
+    else:
+        await msg.answer(f"Вы студент")
+        await msg.answer(msg_student_start) 
+@router.message(Command('edit'))
+@router.message(F.text.in_(["edit","Edit","Редактирование таблиц 🧾"]))
+async def edir_table_status(msg:Message,state:FSMContext):
+    global edit_table
+    edit_table=not edit_table
+    if edit_table:
+        await msg.answer("Вы перешли в режим изменения базы данных",
+                         reply_markup=ReplyKeyboardMarkup(keyboard=[   
+            [KeyboardButton(text="Работы"),KeyboardButton(text="Группы")],
+            [KeyboardButton(text="Дисциплины"),KeyboardButton(text="Назад")]
+        ]),resize_keyboard=True)
+        await state.set_state(Table.choice_table)
+    else:
+        await msg.answer("Вы вышли из режима изменения базы данных")
+        await state.clear()
+        await menu(msg)
+@router.message(Table.choice_table)
+async def table(msg:Message,state:FSMContext):
+    await state.update_data(choice_table=msg.text)
+    kbs={"Работы":kb_admin_works,
+         "Группы":kb_admin_group,
+         "Дисциплины":kb_admin_discipline}
+    if msg.text=="Назад":
+        await msg.answer("Вы вышли из режима изменения базы данных")
+        await state.clear()
+        await menu(msg)
+    elif msg.text in kbs:
+        await msg.answer(f"""
+    Вы выбрали таблицу "{msg.text}"
+    Выберите что хотите сделать с таблицей в клавиатуре ниже!
+                              """, reply_markup= kbs[msg.text])
+        await state.set_state(Table.choice_operation)
+
+@router.message(Table.choice_operation)
+async def set_operation(msg:Message, state:FSMContext):
+    await state.update_data(choice_operation=msg.text)
+    if msg.text=="Назад":
+        await menu(msg)
+    elif msg.text in ["Добавить работу","Просмотреть работы","Изменить работу"]:
+        await msg.answer("Выберите дисциплину:",reply_markup=await kb_return_discipline("discipline sel work"))
+        await msg.answer("",reply_markup=ReplyKeyboardRemove())
+    elif msg.text=="Удалить работу":
+        await msg.answer("В разработке...")
+    elif msg.text=="Добавить группу":
+        await msg.answer("Введите название группы:",reply_markup=ReplyKeyboardRemove())
+        await state.set_state(Table.set_data)
+    elif msg.text=="Просмотреть группы":
+        await msg.answer("Список групп:",reply_markup=await kb_return_group("info group"))
+        state.set_state(Table.choice_operation)
+    elif msg.text=="Изменить группу":
+        await msg.answer("Выберите группу и введите измененное имя",
+                         reply_markup=await kb_return_group("group"))  
+    elif msg.text=="Удалить группу":
+        await msg.answer("Нажмите группу для удаления:",reply_markup=await kb_return_group("group del"))
+    elif msg.text=="Добавить дисциплину":
+        await msg.answer("Введите название дисциплины:",reply_markup=ReplyKeyboardRemove())
+        await state.set_state(Table.set_data)
+    elif msg.text=="Просмотреть дисциплины":
+        await msg.answer("Список дисциплин:",reply_markup=await kb_return_discipline("info discipline"))
+    elif msg.text=="Изменить дисциплину":
+        await msg.answer("В разработке...")
+    elif msg.text=="Удалить дисциплину":
+        await msg.answer("Нажмите дисциплину для удаления:",reply_markup=InlineKeyboardMarkup(inline_keyboard=await kb_return_discipline("discipline del")))
+    else:
+        await msg.answer("Неверная команда!")
+        await state.set_state(Table.choice_operation)
+@router.message(Table.set_data,F.text.in_(["Название","Файл","Отмена"]))
+async def update_work(msg:Message, state:FSMContext):
+    await state.update_data(set_col=msg.text)
+    if msg.text=="Название":
+        await msg.answer("Введите обновленное название работы:", reply_markup=ReplyKeyboardRemove())
+        await state.set_state(Table.set_data)
+    elif msg.text=="Файл":
+        await msg.answer("Отправьте документ:", reply_markup=ReplyKeyboardRemove())
+        await state.set_state(Table.document)
+    elif msg.text=="Отмена":
+        await msg.answer("Операция отменена",reply_markup=ReplyKeyboardMarkup(
+            keyboard=[[]]
+        ))
+@router.message(Table.set_data)
+async def set_data(msg:Message, state:FSMContext):
+    operation = await state.get_data()
+    if operation is None:
+        pass
+    if operation['choice_operation']=="Добавить работу":
+        await state.update_data(set_data=msg.text)
+        await msg.answer("Добавить документ?",reply_markup=ReplyKeyboardMarkup(keyboard=
+                            [
+                                [KeyboardButton(text="Добавить документ"),KeyboardButton(text="Не добавлять документ")]
+                                                      ],resize_keyboard=True)
+                        )
+        await state.set_state(Table.document)
+    elif operation['choice_operation']=="Добавить группу":    
+        await db.add("group",[(msg.text)])
+        await msg.answer("Группа добавлена!\nЖелаете добавит еще?",reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="Добавить еще группу"),KeyboardButton(text="Назад")]],resize_keyboard=True))    
+        await state.set_state(Table.repite)
+    elif operation['choice_operation']=="Добавить дисциплину":
+        await state.update_data(set_data=msg.text)
+        await msg.answer("Выберите группу:",reply_markup=await kb_return_group("discipline group"))
+    elif operation['choice_operation']=="Изменить группу":
+        await db.update_col("group", (operation['group_id'],(msg.text)))
+        await msg.answer("Группа изменена!",reply_markup=kb_admin_group)
+        await state.set_state(Table.choice_operation)
+    elif operation['choice_operation']=="Изменить дисциплину":
+        await db.update_col("discipline", (operation['group_id'], (msg.text)))
+        await msg.answer("Дисциплина изменена!",reply_markup=kb_admin_discipline)
+        await state.set_state(Table.choice_operation)
+    elif operation['choice_operation']=="Изменить работу" and "set_col" in operation:
+        if operation["set_col"]=="Название":
+            work=await db.return_work(operation["work_id"])
+            await db.update_col("works", (operation['work_id'], msg.text,operation["discipline_id"],work[-1].path))
+        elif operation["set_col"]=="Документ":
+            await msg.answer("Отправьте документ:", reply_markup="")
+            await state.set_state(Table.document)
+        await msg.answer("Работа обновлена!",reply_markup=kb_admin_works)
+        await state.clear()
+        await state.set_state(Table.choice_operation)
+    else:
+        await msg.answer("Неверная команда!")
+        await state.set_state(Table.set_data)
+@router.message(Table.repite)
+async def repite(msg:Message, state:FSMContext):
+    if msg.text=="Добавить еще группу":
+        await msg.answer("Введите название группы:",reply_markup=ReplyKeyboardRemove())    
+        await state.set_state(Table.set_data)
+    elif msg.text=="Добавить еще дисциплину":
+        await msg.answer("Введите название дисциплины:",reply_markup=ReplyKeyboardRemove()) 
+        await state.set_state(Table.set_data)
+    elif msg.text=="Добавить еще работу":
+        await msg.answer("Введите название работы:")
+        await state.set_state(Table.set_data)
+    elif msg.text=="Назад":
+        await edir_table_status(msg, state)
+    
+    else:
+        await msg.answer("Неверная команда!")
+        await state.set_state(Table.repite)
+@router.callback_query(F.data.regexp(r"discipline \d+"))
+async def callback_group(msg:Message, state:FSMContext):
+    await msg.answer("Введите название дисциплины:")
+    await state.update_data(group_id=msg.text.split()[1])
+    await state.set_state(Table.set_data)
+@router.callback_query(F.data.regexp(r"group \d+"))
+async def callback_info_group(call:types.CallbackQuery,state:FSMContext):
+    group_id=int(call.data.split()[-1])
+    await state.update_data(group_id=group_id) 
+    await call.message.answer(f"Введите обновленное название группы:",reply_markup=ReplyKeyboardRemove())
+    await state.set_state(Table.set_data)
+@router.callback_query(F.data.regexp(r'group del \d+'))
+async def callback_del_group(call:types.CallbackQuery,state:FSMContext):
+    group_id=int(call.data.split()[-1])
+    await state.update_data(group_id=group_id)
+    await call.message.answer("Уверены что хотите удалить?",reply_markup=InlineKeyboardMarkup(inline_keyboard=
+                            [
+                                [InlineKeyboardButton(text="Да ✅", callback_data=f"choice yes"),InlineKeyboardButton(text="Нет ❌", callback_data=f"choice no") ] ])
+                        )
+@router.callback_query(F.data.regexp(r'choice (yes|no)'))
+async def callback_del_group(call:types.CallbackQuery, state:FSMContext):
+    if call.data.split()[-1]=="yes":
+        operation=await state.get_data()
+        if operation["choice_operation"]=="Удалить группу":
+            await db.delete_col("group", operation['group_id'])
+            await call.message.answer("Группа удалена!")
+        elif operation["choice_operation"]=="Удалить дисциплину":
+            await db.delete_col("discipline", operation['discipline_id'])
+            await call.message.answer("Дисциплина удалена!")
+        elif operation["choice_operation"]=="Удалить работу":
+            await db.delete_col("works", operation['work_id'])
+            await call.message.answer("Работа удалена!")
+        elif operation["choice_operation"]=="Удалить работу студента":
+            await db.delete_col("works_student", operation['works_student_id'])
+            await call.message.answer("Работа студента удалена!")
+    else:
+        await call.message.answer("Группа не удалена!")
+    await state.clear()
+@router.callback_query(F.data.regexp(r'discipline group \d+'))
+async def callback_discipline(call:types.CallbackQuery,state:FSMContext):
+    group_id=int(call.data.split()[-1])
+    data=await state.get_data()
+    group=await db.return_group(group_id)
+    await state.update_data(group_id=group_id)
+    await call.message.answer(f"""
+    Дисциплина:{data["set_data"]}
+    Группа:{group.name}
+    """,reply_markup=ReplyKeyboardRemove())
+    await db.add("discipline", [(data['set_data'], group_id)])
+    await call.message.answer("Дисциплина добавлена!\nЖелаете добавит еще?", reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="Добавить еще дисциплину"), KeyboardButton(text="Назад")]], resize_keyboard=True))
+    await state.set_state(Table.repite)
+@router.callback_query(F.data.regexp(r"discipline del \d+")) 
+async def callback_del_discipline(call:types.CallbackQuery,state:FSMContext):
+    discipline_id=int(call.data.split()[-1])
+    await state.update_data(discipline_id=discipline_id)
+    await call.message.answer("Уверены что хотите удалить?",reply_markup=InlineKeyboardMarkup(inline_keyboard=
+                            [
+                                [InlineKeyboardButton(text="Да ✅", callback_data=f"choice yes"),InlineKeyboardButton(text="Нет ❌", callback_data=f"choice no") ] ])
+                        )
+@router.callback_query(F.data.regexp(r"discipline sel work \d+"))
+async def callback_work(call:types.CallbackQuery,state:FSMContext):
+    discipline_id=int(call.data.split()[-1])
+    await state.update_data(discipline_id=discipline_id)
+    data=await state.get_data()
+    if data["choice_operation"]=="Просмотреть работы":
+        await call.message.answer("Список работ:",
+                         reply_markup=await kb_return_works(discipline_id)
+                        )
+    elif data["choice_operation"]=="Добавить работу":
+        await call.message.answer("Введите название работы:",reply_markup= ReplyKeyboardRemove())
+        await state.set_state(Table.set_data)
+    elif data["choice_operation"]=="Изменить работу":
+        await call.message.answer("Выберите работу для изменения:", reply_markup= await kb_return_works(discipline_id, "work update"))
+@router.message(Table.document,F.text.in_(["Добавить документ","Не добавлять документ"]))
+async def add_work(msg:Message,state:FSMContext):
+    data=await state.get_data()
+    if msg.text=="Добавить документ":
+        await msg.answer("Отправьте документ:")
+        await state.set_state(Table.document)
+    else:
+        await db.add("works", [(data['set_data'], data['discipline_id'],None)])
+        await msg.answer("Работа добавлена!\nЖелаете добавит еще?", reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="Добавить еще работу"), KeyboardButton(text="Назад")]], resize_keyboard=True))
+        await state.set_state(Table.repite)
+
+@router.message(Table.document, F.document)
+async def add_document(msg:Message,state:FSMContext,bot:Bot):
+    data=await state.get_data()
+    disc=await db.return_discipline(data['discipline_id'])
+    path= Path(__file__).parent.parent / "files"/"documents"/disc[-1].name 
+    path=path.resolve()
+    path.mkdir(parents=True, exist_ok=True)
+    path/=msg.document.file_name 
+    path=path.resolve()
+    await bot.download(file=msg.document, destination=path)
+    if "set_col" in data:
+        work=await db.return_work(data['work_id'])
+        await db.update_col("works", (data['work_id'], work[-1].name, data['discipline_id'],str(path)))
+        await msg.answer("Работа обновлена!",reply_markup=kb_admin_works)
+        await state.clear()
+        await state.set_state(Table.choice_operation)
+    else:
+        await db.add("works", [(data['set_data'], data['discipline_id'],str(path))])
+        await msg.answer("Работа добавлена!\nЖелаете добавит еще?", reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="Добавить еще работу"), KeyboardButton(text="Назад")]], resize_keyboard=True))
+        await state.set_state(Table.repite)
+
+@router.callback_query(F.data.regexp(r"work del \d+"))
+async def callback_del_work(call:types.CallbackQuery, state:FSMContext):
+    work_id=int(call.data.split()[-1])
+    await state.update_data(work_id=work_id)
+    await call.message.answer("Уверены что хотите удалить?",reply_markup=InlineKeyboardMarkup(inline_keyboard=
+                            [
+                                [InlineKeyboardButton(text="Да ✅", callback_data=f"choice yes"),InlineKeyboardButton(text="Нет ❌", callback_data=f"choice no") ] ])
+                        )
+    await state.set_state(Table.set_data)
+@router.callback_query(F.data.regexp(r"work update \d+"))
+async def callback_update_work(call:types.CallbackQuery, state:FSMContext):
+    work_id=int(call.data.split()[-1])
+    await state.update_data(work_id=work_id)
+    await call.message.answer("Выберите что хотите изменить",reply_markup=ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="Название"),KeyboardButton(text="Файл")],
+                   [KeyboardButton(text="Отмена")]],
+        resize_keyboard=True
+    ))
+    await state.set_state(Table.set_data)

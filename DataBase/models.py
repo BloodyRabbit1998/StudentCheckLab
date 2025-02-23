@@ -29,7 +29,6 @@ class Student(Base):
     telegram_id:Mapped[int] = mapped_column(BigInteger, primary_key=True)
     name:Mapped[str] = mapped_column(String)
     id_group:Mapped[int] = mapped_column(ForeignKey("Группы.id"))
-    year_study:Mapped[int] = mapped_column(Integer)
     def __str__(self):
         return f"{self.telegram_id} \t|\t{self.name} \t|\t{self.id_group} \t|\t{self.year_study}"
 class Discipline(Base):
@@ -44,6 +43,7 @@ class Works(Base):
     id:Mapped[int] = mapped_column(primary_key=True, index=True)
     name:Mapped[str] = mapped_column(String)
     id_discipline:Mapped[int] = mapped_column(ForeignKey("Дисциплины.id"))
+    path:Mapped[str] = mapped_column(String,nullable=True)
     def __str__(self):
         return f"{self.id} \t|\t{self.name} \t|\t{self.id_discipline}"
 class WorksStudent(Base):
@@ -53,7 +53,7 @@ class WorksStudent(Base):
     id_work:Mapped[int] = mapped_column(ForeignKey("Работы.id"))
     date_of_delivery:Mapped[Date] = mapped_column(Date)
     path:Mapped[str] = mapped_column(String)
-    accept:Mapped[bool] = mapped_column(Boolean,)   
+    accept:Mapped[bool] = mapped_column(Boolean,nullable=True)  # None - не проверонно, True -работа принята, False - работа не принята
     def __str__(self):
         return f"{self.id} \t|\t{self.id_student} \t|\t{self.id_work} \t|\t{self.date_of_delivery} \t|\t{self.path} \t|\t{self.accept}"
 
