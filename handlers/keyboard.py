@@ -65,3 +65,12 @@ async def kb_return_disciplin_id(call_text:str,id_student:int):
     kb=InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=student.name, callback_data=f"{call_text} {student.id}")] for student in await db.return_discipline("",id_group=student[-1].id_group)])
     return kb
+async def kb_return_student_works(id_student,id_discipline,call_text:str):
+    data=await db.retutn_works_student_all(id_student, id_discipline)
+    status={True:"✅",False:"❌",None:"🕖"}
+    def r_work(work):
+        work=work[-1]   
+        return work.name
+    kb=InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f'{r_work(await db.return_work(row.id_work))} {status[row.accept]}', callback_data=f"{call_text} {row.id}")] for row in data])
+    return kb

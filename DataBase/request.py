@@ -1,42 +1,42 @@
 from .models import *
 from sqlalchemy import select,update,delete
 
-async def return_group(col:int|str):
+async def return_group(row:int|str)->Group:
     async with SESSION() as db: 
-        if type(col)==int:
-            stmt=select(Group).where(Group.id==col)
+        if type(row)==int:
+            stmt=select(Group).where(Group.id==row)
         else:
-            stmt=select(Group).where(Group.name==col)
-        cols=await db.scalars(stmt)
-    logging.debug(cols)
-    cols=[col for col in cols]
-    return cols[-1] if cols else None
+            stmt=select(Group).where(Group.name==row)
+        rows=await db.scalars(stmt)
+    logging.debug(rows)
+    rows=[row for row in rows]
+    return rows[-1] if rows else None
 
-async def return_student(col:int|str):
+async def return_student(row:int|str)->list[Student]:
     async with SESSION() as db: 
-        if type(col)==int:
-            stmt=select(Student).where(Student.telegram_id==col)
+        if type(row)==int:
+            stmt=select(Student).where(Student.telegram_id==row)
         else:
-            stmt=select(Student).where(Student.name==col)
-        cols=await db.scalars(stmt)
-    logging.debug(cols)
-    return [col for col in cols]
+            stmt=select(Student).where(Student.name==row)
+        rows=await db.scalars(stmt)
+    logging.debug(rows)
+    return [row for row in rows]
 
-async def return_discipline(col:int|str,**kwargs):
+async def return_discipline(row:int|str,**kwargs)->list[Discipline]:
     if kwargs:
         if "id_group" in kwargs:
             stmt=select(Discipline).where(Discipline.id_group==kwargs["id_group"])
     else:
-        if type(col)==int:
-            stmt=select(Discipline).where(Discipline.id==col)
+        if type(row)==int:
+            stmt=select(Discipline).where(Discipline.id==row)
         else:
-            stmt=select(Discipline).where(Discipline.name==col)
+            stmt=select(Discipline).where(Discipline.name==row)
     async with SESSION() as db:
-        cols=await db.scalars(stmt)
-    logging.debug(cols)
-    return [col for col in cols]
+        rows=await db.scalars(stmt)
+    logging.debug(rows)
+    return [row for row in rows]
 
-async def return_work(id:int,**kwargs):
+async def return_work(id:int,**kwargs)->list[Works]:
     if kwargs:
         if "id_discipline" in kwargs:
             stmt=select(Works).where(Works.id_discipline==kwargs["id_discipline"])
@@ -46,26 +46,18 @@ async def return_work(id:int,**kwargs):
         stmt=select(Works).where(Works.id==id)
             
     async with SESSION() as db:
-        cols=await db.scalars(stmt)
-    logging.debug(cols)
-    return [col for col in cols]
-async def return_works_student(col:int|Student):
-    async with SESSION() as db:
-        if type(col)==int:
-            stmt=select(WorksStudent).where(WorksStudent.id==col)
-        else:
-            stmt=select(WorksStudent).where(WorksStudent.id_student==Student.telegram_id)
-        cols=await db.scalars(stmt)
-    logging.debug(cols)
-    return [col for col in cols]
-async def check_work(id_student:int,id_work:int):
+        rows=await db.scalars(stmt)
+    logging.debug(rows)
+    return [row for row in rows]
+
+async def check_work(id_student:int,id_work:int)->list[WorksStudent]:
     async with SESSION() as db:
         stmt=select(WorksStudent).where(WorksStudent.id_student==id_student and WorksStudent.id_work==id_work)
-        cols=await db.scalars(stmt)
-    logging.debug(cols)
-    return [col for col in cols]
+        rows=await db.scalars(stmt)
+    logging.debug(rows)
+    return [row for row in rows]
 
-async def add(table:str,data:list[tuple]):  
+async def add(table:str,data:list[tuple])->list:  
     """
     Group: id,name,yeat_study
     Student: telegram_id,name,id_group
@@ -73,29 +65,29 @@ async def add(table:str,data:list[tuple]):
     Works: name,id_discipline
     WorksStudent: id_student,id_work,date_of_delivery,path,accept
     """
-    cols=[]
+    rows=[]
     if table=="student":               
-            cols=[Student(telegram_id=telegram_id,name=name,id_group=id_group) for telegram_id,name,id_group in data if not await return_student(telegram_id)]
+            rows=[Student(telegram_id=telegram_id,name=name,id_group=id_group) for telegram_id,name,id_group in data if not await return_student(telegram_id)]
     elif table=="group":
-        cols=[Group(name=name) for name in data if not await return_group(name)]
+        rows=[Group(name=name) for name in data if not await return_group(name)]
     elif table=="discipline":
-        cols=[Discipline(name=name,id_group=id_group) for name,id_group in data if not await return_discipline(name)]
+        rows=[Discipline(name=name,id_group=id_group) for name,id_group in data if not await return_discipline(name)]
     elif table=="works":
-        cols=[Works(id_discipline=id_discipline,name=name,path=path) for name,id_discipline,path in data]
+        rows=[Works(id_discipline=id_discipline,name=name,path=path) for name,id_discipline,path in data]
     elif table=="works_student":
-        cols=[]
+        rows=[]
         for id_student,id_work,date_of_delivery,path,accept in data:
             work=await check_work(id_student,id_work)
             if not work:
-                cols.append(WorksStudent(id_student=id_student,id_work=id_work,date_of_delivery=date_of_delivery,path=path,accept=accept))
+                rows.append(WorksStudent(id_student=id_student,id_work=id_work,date_of_delivery=date_of_delivery,path=path,accept=accept))
             else:
                 await update("works_student",[(work[0].id,id_student,id_work,date_of_delivery,path,accept)])
     async with SESSION() as db:  
-        if cols:
-            db.add_all(cols)
+        if rows:
+            db.add_all(rows)
             await db.commit()
-    return cols
-async def delete_col(table:str,ids:int|list[int]):
+    return rows
+async def delete_col(table:str,ids:int|list[int])->None:
     if table=="student":
         if type(ids)==int:
             stmts=[delete(Student).where(Student.id==ids)]  
@@ -125,7 +117,7 @@ async def delete_col(table:str,ids:int|list[int]):
         for stmt in stmts:
             db.execute(stmt) 
             await db.commit()
-async def update_col(table:str,data:tuple):
+async def update_col(table:str,data:tuple)->None:
     """
     Group: id,name
     Student: id,telegram_id,name,id_group
@@ -133,7 +125,6 @@ async def update_col(table:str,data:tuple):
     Works: id,name,id_discipline
     WorksStudent: id,id_student,id_work,date_of_delivery,path,accept
     """
-    cols=[]
     if table=="student":
         id,telegram_id,name,id_group=data
         stmt=update(Student).where(Student.id==id).values(telegram_id=telegram_id,name=name,id_group=id_group)
@@ -151,11 +142,11 @@ async def update_col(table:str,data:tuple):
     else:
         logging.INFO("Такой таблицы не существует!")
     async with SESSION() as db:
-            logging.debug(cols)
+            logging.debug(f"Обновление данных таблицы: {table}")
             await db.execute(stmt)
             logging.info("Обновлен!")
             await db.commit()
-async def return_all(table:str):
+async def return_all(table:str)->list:
     if table=="student":
         stmt=select(Student)
     elif table=="group":
@@ -167,7 +158,17 @@ async def return_all(table:str):
     elif table=="works_student":
         stmt=select(WorksStudent)
     async with SESSION() as db:
-        return await db.scalars(stmt)
+        return [row for row in await db.scalars(stmt)]
+async def retutn_works_student_all(id_student:int, id_discipline:int=None)->list:
+    if id_discipline:
+        stmt=select(WorksStudent,Works.name).join(Works,WorksStudent.id_work==Works.id).where(WorksStudent.id_student==id_student and Works.id_discipline==id_discipline)
+    else:
+        stmt=select(WorksStudent).where(WorksStudent.id_student==id_student)
+    async with SESSION() as db:
+        rows=await db.scalars(stmt)
+    logging.debug("получены данные работ студентов!")
+    return [row for row in rows]
+
 
 if __name__=="__main__":
     with SESSION() as db:
