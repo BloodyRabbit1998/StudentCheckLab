@@ -25,36 +25,24 @@ class AdminFilter(BaseFilter):
         result=message.from_user.id in ADMINS
         return result
 @router.message(AdminFilter(),CommandStart())
-@router.message(Command('start'),AdminFilter())
+@router.message(AdminFilter(),Command('start'))
 async def start_handler(msg:Message,state:FSMContext):
     await msg.answer_sticker(r"CAACAgQAAxkBAAED3Q1l5EuHETdkCgz_OEPKmjcPJXwyxQACAwYAAgtetBq169NzfwFttTQE")#,reply_markup=kb)
     await msg.answer(f"Вы админ",reply_markup=kb_admin_main) 
     await msg.answer(msg_admin_start)  
-@router.message(Command('menu'))
-@router.message(F.text=="menu", AdminFilter())
+@router.message(AdminFilter(),Command('menu'))
+@router.message(AdminFilter(),F.text=="menu")
 async def menu(msg:Message):
-    if str(msg.from_user.id) in ADMINS:
-        global edit_table
-        await msg.answer(f"Админ панель",reply_markup=kb_admin_main) 
-        edit_table=False
-    else:
-        await msg.answer("Меню",reply_markup=kb_student_main) 
+    global edit_table
+    await msg.answer(f"Админ панель",reply_markup=kb_admin_main) 
+    edit_table=False
 @router.message(Command('id'))
 @router.message(F.text=="id")
 async def massage_id(msg:Message):
     await msg.answer(f"Ваш ID: {msg.from_user.id}")
 
-@router.message(Command('status'))
-@router.message(F.text=="status")
-async def massage_status(msg:Message):
-    if str(msg.from_user.id) in ADMINS:
-        await msg.answer(f"Вы админ")
-        await msg.answer(msg_admin_start)   
-    else:
-        await msg.answer(f"Вы студент")
-        await msg.answer(msg_student_start) 
-@router.message(Command('edit'))
-@router.message(F.text.in_(["edit","Edit","Редактирование таблиц 🧾"]))
+@router.message(AdminFilter(),Command('edit'))
+@router.message(AdminFilter(),F.text.in_(["edit","Edit","Редактирование таблиц 🧾"]))
 async def edir_table_status(msg:Message,state:FSMContext):
     global edit_table
     edit_table=not edit_table
