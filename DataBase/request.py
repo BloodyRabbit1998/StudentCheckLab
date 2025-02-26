@@ -90,9 +90,9 @@ async def add(table:str,data:list[tuple])->list:
 async def delete_col(table:str,ids:int|list[int])->None:
     if table=="student":
         if type(ids)==int:
-            stmts=[delete(Student).where(Student.id==ids)]  
+            stmts=[delete(Student).where(Student.telegram_id==ids)]  
         else: 
-            stmts=[delete(Student).where(Student.id==id) for id in ids]
+            stmts=[delete(Student).where(Student.telegram_id==id) for id in ids]
     elif table=="group":
         if type(ids)==int:
             stmts=[delete(Group).where(Group.id==ids)]   
@@ -120,14 +120,14 @@ async def delete_col(table:str,ids:int|list[int])->None:
 async def update_col(table:str,data:tuple)->None:
     """
     Group: id,name
-    Student: id,telegram_id,name,id_group
+    Student: telegram_id,name,id_group
     Discipline:id, name,id_group
     Works: id,name,id_discipline
     WorksStudent: id,id_student,id_work,date_of_delivery,path,accept
     """
     if table=="student":
-        id,telegram_id,name,id_group=data
-        stmt=update(Student).where(Student.id==id).values(telegram_id=telegram_id,name=name,id_group=id_group)
+        telegram_id,name,id_group=data
+        stmt=update(Student).where(Student.telegram_id==telegram_id).values(telegram_id=telegram_id,name=name,id_group=id_group)
     elif table=="group":
         id,name=data
         stmt=update(Group).where(Group.id==id).values(name=name)
