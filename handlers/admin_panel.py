@@ -101,7 +101,7 @@ async def set_operation(msg:Message, state:FSMContext):
     elif msg.text=="Просмотреть дисциплины":
         await msg.answer("Список дисциплин:",reply_markup=await kb_return_discipline("info discipline"))
     elif msg.text=="Изменить дисциплину":
-        await msg.answer("В разработке...")
+        await msg.answer("Список дисциплин:",reply_markup=await kb_return_discipline("update discipline"))
     elif msg.text=="Удалить дисциплину":
         await msg.answer("Нажмите дисциплину для удаления:",reply_markup=InlineKeyboardMarkup(inline_keyboard=await kb_return_discipline("discipline del")))
     else:
@@ -145,8 +145,9 @@ async def set_data(msg:Message, state:FSMContext):
         await msg.answer("Группа изменена!",reply_markup=kb_admin_group)
         await state.set_state(Table.choice_operation)
     elif operation['choice_operation']=="Изменить дисциплину":
-        await db.update_col("discipline", (operation['group_id'], (msg.text)))
+        await db.update_col("discipline", (operation['discipline_id'], (msg.text)))
         await msg.answer("Дисциплина изменена!",reply_markup=kb_admin_discipline)
+        await state.clear()
         await state.set_state(Table.choice_operation)
     elif operation['choice_operation']=="Изменить работу" and "set_col" in operation:
         if operation["set_col"]=="Название":
@@ -301,4 +302,10 @@ async def callback_update_work(call:types.CallbackQuery, state:FSMContext):
                    [KeyboardButton(text="Отмена")]],
         resize_keyboard=True
     ))
+    await state.set_state(Table.set_data)
+@router.callback_query(F.data.regexp(r"update discipline \d+"))
+async def update_disc(call:types.CallbackQuery, state:FSMContext):
+    discipline_id=int(call.data.split()[-1])
+    await state.update_data(discipline_id=discipline_id)
+    await call.message.answer("Введите обновленное название дисциплины:", reply_markup=ReplyKeyboardRemove())
     await state.set_state(Table.set_data)

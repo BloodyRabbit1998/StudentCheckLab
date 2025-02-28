@@ -132,8 +132,8 @@ async def update_col(table:str,data:tuple)->None:
         id,name=data
         stmt=update(Group).where(Group.id==id).values(name=name)
     elif table=="discipline":
-        id,name,id_group=data
-        stmt=update(Discipline).where(Discipline.id==id).values(name=name, id_group=id_group)
+        id,name=data
+        stmt=update(Discipline).where(Discipline.id==id).values(name=name)
     elif table=="works":
         id,name,id_discipline,path=data
         stmt=update(Works).where(Works.id==id).values(name=name, id_discipline=id_discipline, path=path)
