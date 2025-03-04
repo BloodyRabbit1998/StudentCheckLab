@@ -14,3 +14,8 @@ class AddWork(StatesGroup):
     choice_discipline=State()
     choice_work=State()
     document=State()
+class CheckWork(StatesGroup):
+    choice_discipline=State()
+    choice_student=State()
+    choice_work=State()
+    check_work=State()

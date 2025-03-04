@@ -19,8 +19,8 @@ msg_student_start="""
     /menu           - вызов меню
         """
 kb_admin_main=ReplyKeyboardMarkup(keyboard=[
-                                [KeyboardButton(text="Редактирование таблиц 🧾"), KeyboardButton(text="Просмотреть работы 🧾")],
-                                [ KeyboardButton(text="Список услуг 🧾"), KeyboardButton(text="Список услуг 🧾")],
+                                [KeyboardButton(text="Редактирование таблиц 🧾"), KeyboardButton(text="Просмотреть работы 🔎")],
+                                [ KeyboardButton(text="Отчет 📠"), KeyboardButton(text="Список услуг 🧾")],
                                 [ KeyboardButton(text="Список услуг 🧾")]],
                                 resize_keyboard=True)                    
 kb_student_main=ReplyKeyboardMarkup(keyboard=[
@@ -74,3 +74,9 @@ async def kb_return_student_works(id_student,id_discipline,call_text:str):
     kb=InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=f'{r_work(await db.return_work(row.id_work))} {status[row.accept]}', callback_data=f"{call_text} {row.id}")] for row in data])
     return kb
+async def kb_retutn_student_work(id_student:int, id_discipline:int,call_text:str):
+    data=await db.return_student_work_none(id_student,id_discipline)
+    kb=InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f'{r_work(await db.return_work(row.id_work))} {status[row.accept]}', callback_data=f"{call_text} {row.id}")] for row in data])
+    return kb
+ 

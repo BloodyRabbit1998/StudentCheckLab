@@ -309,3 +309,15 @@ async def update_disc(call:types.CallbackQuery, state:FSMContext):
     await state.update_data(discipline_id=discipline_id)
     await call.message.answer("Введите обновленное название дисциплины:", reply_markup=ReplyKeyboardRemove())
     await state.set_state(Table.set_data)
+@router.message(AdminFilter(),F.text=='Просмотреть работы 🔎')
+async def view_works(msg:Message, state:FSMContext):
+    await msg.answer("Выберите дисциплину:", reply_markup=await kb_return_discipline("discipline check work"))
+    await state.update_data(choice_operation="Просмотреть работы")
+    await state.set_state(CheckWork.choice_discipline)
+@router.callback_query(CheckWork.choice_discipline,F.data.regexp(r"discipline check work \d+"))
+async def callback_work(call:types.CallbackQuery, state:FSMContext):
+    discipline_id=int(call.data.split()[-1])
+    
+    await state.update_data(discipline_id=discipline_id)
+    await call.message.answer("Работы по дисциплине", reply_markup=await kb_return_disciplin_id("student check work", discipline_id))
+    await state.set_state(CheckWork.choice_student)

@@ -168,7 +168,18 @@ async def retutn_works_student_all(id_student:int, id_discipline:int=None)->list
         rows=await db.scalars(stmt)
     logging.debug("получены данные работ студентов!")
     return [row for row in rows]
-
+async def return_student_work_none(id_student:int,discipline_id:int=None)->list:
+    if discipline_id:
+        stmt=select(
+            WorksStudent.id.label("id"),
+            Student.name.label("student_name"),
+            Works.name.lanel('work_name')).join(Student, WorksStudent.id_student==Student.telegram_id).join(Works,WorksStudent.id_work==Works.id).where(Student.telegram_id==id_student and Works.id_discipline==discipline_id and WorksStudent.accept==None)
+    else:
+        stmt=select(WorksStudent).where(WorksStudent.id_student==id_student and WorksStudent.accept==None)
+    async with SESSION() as db:
+        rows=await db.scalars(stmt)
+    logging.debug("получены данные работ студентов!")
+    return [row for row in rows]
 
 if __name__=="__main__":
     with SESSION() as db:

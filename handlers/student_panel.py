@@ -29,7 +29,7 @@ async def set_name(msg:Message, state:FSMContext):
     await state.update_data(name=msg.text)
     await msg.answer("Выберите вашу группу:", reply_markup=await kb_return_group("student sel group"))
     await state.set_state(Student.choice_Group)
-@router.message(Command('menu'),F.text.in_(["menu","Menu","Меню"]))
+@router.message(Command('menu'))
 async def menu(msg:Message):
     await msg.answer("Панель управления", reply_markup=kb_student_main)
 @router.callback_query(F.data.regexp(r"student sel group \d+"),Student.choice_Group)
