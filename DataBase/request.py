@@ -81,7 +81,7 @@ async def add(table:str,data:list[tuple])->list:
             if not work:
                 rows.append(WorksStudent(id_student=id_student,id_work=id_work,date_of_delivery=date_of_delivery,path=path,accept=accept))
             else:
-                await update("works_student",[(work[0].id,id_student,id_work,date_of_delivery,path,accept)])
+                await update_col("works_student",(work[0].id,id_student,id_work,date_of_delivery,path,accept))
     async with SESSION() as db:  
         if rows:
             db.add_all(rows)
