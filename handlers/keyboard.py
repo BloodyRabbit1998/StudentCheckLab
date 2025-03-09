@@ -76,8 +76,9 @@ async def kb_return_student_works(id_student,id_discipline,call_text:str):
     return kb
 async def kb_retutn_students_work(id_discipline:int,call_text:str):
     data=await db.return_student_work_none(id_discipline)
-    kb=InlineKeyboardMarkup(reply_keyboard=[
+    kb=InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=f'{shorten_name(row.name_student)}({row.group_name})-{row.count}', callback_data=f"{call_text} {row.id_work}")] for row in data])
+    
     return kb
 
 def shorten_name(full_name):

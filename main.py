@@ -11,7 +11,7 @@ from aiogram.client.default import DefaultBotProperties
 """
 TODO: 
 -не работает удаление данных из базы данных. Надо доработать функцию delete_col
--проверять наличие имени у студента
+-проверять наличие имени у студента по регулярным выражениям
 """
 async def main():
     await models.create_db()
