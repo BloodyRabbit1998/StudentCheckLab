@@ -319,5 +319,5 @@ async def callback_work(call:types.CallbackQuery, state:FSMContext):
     discipline_id=int(call.data.split()[-1])
     
     await state.update_data(discipline_id=discipline_id)
-    await call.message.answer("Работы по дисциплине", reply_markup=await kb_return_disciplin_id("student check work", discipline_id))
+    await call.message.answer("Работы по дисциплине", reply_markup=await kb_retutn_students_work( discipline_id,"student check work"))
     await state.set_state(CheckWork.choice_student)

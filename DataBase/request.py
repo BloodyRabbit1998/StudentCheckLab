@@ -1,6 +1,6 @@
 from .models import *
 from sqlalchemy import select,update,delete
-
+from sqlalchemy.sql.expression import func
 async def return_group(row:int|str)->Group:
     async with SESSION() as db: 
         if type(row)==int:
@@ -52,7 +52,7 @@ async def return_work(id:int,**kwargs)->list[Works]:
 
 async def check_work(id_student:int,id_work:int)->list[WorksStudent]:
     async with SESSION() as db:
-        stmt=select(WorksStudent).where(WorksStudent.id_student==id_student and WorksStudent.id_work==id_work)
+        stmt=select(WorksStudent).where(WorksStudent.id_student==id_student).where(WorksStudent.id_work==id_work)
         rows=await db.scalars(stmt)
     logging.debug(rows)
     return [row for row in rows]
@@ -161,23 +161,50 @@ async def return_all(table:str)->list:
         return [row for row in await db.scalars(stmt)]
 async def retutn_works_student_all(id_student:int, id_discipline:int=None)->list:
     if id_discipline:
-        stmt=select(WorksStudent,Works.name).join(Works,WorksStudent.id_work==Works.id).where(WorksStudent.id_student==id_student and Works.id_discipline==id_discipline)
+        stmt=select(
+            WorksStudent.id,Works.name,WorksStudent.accept
+            ).join(Works,WorksStudent.id_work==Works.id
+            ).where(WorksStudent.id_student==id_student,Works.id_discipline==id_discipline)
     else:
-        stmt=select(WorksStudent).where(WorksStudent.id_student==id_student)
+        stmt=select(WorksStudent.id).where(WorksStudent.id_student==id_student)
     async with SESSION() as db:
-        rows=await db.scalars(stmt)
+        rows=await db.execute(stmt)
     logging.debug("получены данные работ студентов!")
     return [row for row in rows]
-async def return_student_work_none(id_student:int,discipline_id:int=None)->list:
-    if discipline_id:
-        stmt=select(
-            WorksStudent.id.label("id"),
-            Student.name.label("student_name"),
-            Works.name.lanel('work_name')).join(Student, WorksStudent.id_student==Student.telegram_id).join(Works,WorksStudent.id_work==Works.id).where(Student.telegram_id==id_student and Works.id_discipline==discipline_id and WorksStudent.accept==None)
+
+async def return_student_work_none(discipline_id:int,id_student:int=None)->list:
+    """ if id_student:  
+            return id_work,name_student,group.name,count
+        else:
+            return """
+    if id_student:
+        stmt = select(
+            WorksStudent.id_work.label("id_work"),
+            Works.name.label("name_work"), 
+                ).join(WorksStudent, WorksStudent.id_student == Student.telegram_id
+                ).join(Works, WorksStudent.id_work == Works.id
+                ).join(Group, Student.id_group==Group.id
+                ).where(Works.id_discipline == discipline_id,
+                        WorksStudent.accept == None,
+                        Student.telegram_id == id_student
+                ).group_by(Student.name, WorksStudent.id_work
+                ).order_by(Student.name)
+
     else:
-        stmt=select(WorksStudent).where(WorksStudent.id_student==id_student and WorksStudent.accept==None)
+        stmt = select(
+            WorksStudent.id_work.label("id_work"),
+            Student.name.label("name_student"),
+            Group.name.label("group_name"),
+            func.count(WorksStudent.id_work).label("count")
+                ).join(WorksStudent, WorksStudent.id_student == Student.telegram_id
+                ).join(Works, WorksStudent.id_work == Works.id
+                ).join(Group, Student.id_group==Group.id
+                ).where(WorksStudent.accept == None
+                ).where(Works.id_discipline == discipline_id
+                ).order_by(Student.name)
+
     async with SESSION() as db:
-        rows=await db.scalars(stmt)
+        rows=await db.execute(stmt)
     logging.debug("получены данные работ студентов!")
     return [row for row in rows]
 

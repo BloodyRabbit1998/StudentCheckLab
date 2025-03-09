@@ -72,11 +72,18 @@ async def kb_return_student_works(id_student,id_discipline,call_text:str):
         work=work[-1]   
         return work.name
     kb=InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=f'{r_work(await db.return_work(row.id_work))} {status[row.accept]}', callback_data=f"{call_text} {row.id}")] for row in data])
+        [InlineKeyboardButton(text=f'{r_work(await db.return_work(row.id))} {status[row.accept]}', callback_data=f"{call_text} {row.id}")] for row in data])
     return kb
-async def kb_retutn_student_work(id_student:int, id_discipline:int,call_text:str):
-    data=await db.return_student_work_none(id_student,id_discipline)
-    kb=InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=f'{r_work(await db.return_work(row.id_work))} {status[row.accept]}', callback_data=f"{call_text} {row.id}")] for row in data])
+async def kb_retutn_students_work(id_discipline:int,call_text:str):
+    data=await db.return_student_work_none(id_discipline)
+    kb=InlineKeyboardMarkup(reply_keyboard=[
+        [InlineKeyboardButton(text=f'{shorten_name(row.name_student)}({row.group_name})-{row.count}', callback_data=f"{call_text} {row.id_work}")] for row in data])
     return kb
- 
+
+def shorten_name(full_name):
+    parts = full_name.split()
+    if len(parts) < 2:
+        return full_name
+    last_name = parts[-1]
+    initials = [f"{part[0]}." for part in parts[:-1]]
+    return f"{' '.join(initials)} {last_name}"
