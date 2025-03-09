@@ -26,6 +26,10 @@ async def start(msg:Message,state:FSMContext):
         await state.set_state(Student.choice_Name)
 @router.message(Student.choice_Name)
 async def set_name(msg:Message, state:FSMContext):
+    if msg.text=="" or msg.text==None or "/" in msg.text:
+        await msg.answer("Введите корректное имя!")
+        state.set_state(Student.choice_Name)
+        return
     await state.update_data(name=msg.text)
     await msg.answer("Выберите вашу группу:", reply_markup=await kb_return_group("student sel group"))
     await state.set_state(Student.choice_Group)
