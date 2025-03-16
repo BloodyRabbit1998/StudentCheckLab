@@ -130,3 +130,26 @@ async def callback_discipline(call:types.CallbackQuery, state:FSMContext):
                               reply_markup=await kb_return_student_works(call.from_user.id, discipline_id,"work student"))
     await state.clear()
     await menu(call.message)
+
+
+@router.message(F.text=="Получить шаблон📝")
+async def get_template(msg:Message, state:FSMContext):
+    await state.clear()
+    await msg.answer("Выберите шаблон:", reply_markup=InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Шаблон отчета", callback_data="template 1")],
+    ]))
+@router.callback_query(F.data.regexp(r"template \d+"))
+async def get_work(call:types.CallbackQuery,bot:Bot):
+    try:
+        template=call.data.split()[-1]
+        path=Path(__file__).parent.parent / "files" /"documents" /"templates"
+        if template=='1':
+            file_input = FSInputFile(path / "ОТЧЕТ_template.dotx")
+            await bot.send_document(
+                call.message.chat.id, file_input,
+                caption=f'Отчет к Лабораторной работе')
+        else:
+            await call.message.answer("Не известная команда!")
+    except Exception as e:
+        await call.message.answer("Запрашиваемый файл не обнаружен!")

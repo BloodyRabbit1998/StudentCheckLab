@@ -1,3 +1,4 @@
 .env
 **/documents/*
+!files/documents/templates/*
 **/db.sqlite3

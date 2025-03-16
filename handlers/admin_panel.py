@@ -245,13 +245,14 @@ async def callback_work(call:types.CallbackQuery,state:FSMContext):
     data=await state.get_data()
     if data["choice_operation"]=="Просмотреть работы":
         await call.message.answer("Список работ:",
-                         reply_markup=await kb_return_works(discipline_id)
+                         reply_markup=await kb_return_works(discipline_id,"view lab")
                         )
     elif data["choice_operation"]=="Добавить работу":
         await call.message.answer("Введите название работы:",reply_markup= ReplyKeyboardRemove())
         await state.set_state(Table.set_data)
     elif data["choice_operation"]=="Изменить работу":
         await call.message.answer("Выберите работу для изменения:", reply_markup= await kb_return_works(discipline_id, "work update"))
+
 @router.message(Table.document,F.text.in_(["Добавить документ","Не добавлять документ"]))
 async def add_work(msg:Message,state:FSMContext):
     data=await state.get_data()

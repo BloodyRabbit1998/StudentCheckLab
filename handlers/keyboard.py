@@ -25,7 +25,7 @@ kb_admin_main=ReplyKeyboardMarkup(keyboard=[
                                 resize_keyboard=True)                    
 kb_student_main=ReplyKeyboardMarkup(keyboard=[
                                 [KeyboardButton(text="Сдать работу🧾"), KeyboardButton(text="Список моих работ")],
-                                [ KeyboardButton(text="Получить работу👁‍🗨")]],
+                                [ KeyboardButton(text="Получить работу👁‍🗨"),KeyboardButton(text="Получить шаблон📝")]],
                                 resize_keyboard=True)
 kb_admin_works=ReplyKeyboardMarkup(keyboard=[
                                 [KeyboardButton(text="Добавить работу"),KeyboardButton(text="Просмотреть работы")],
