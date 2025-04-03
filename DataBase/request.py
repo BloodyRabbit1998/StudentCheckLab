@@ -202,11 +202,11 @@ async def return_student_work_none(discipline_id:int,id_work:int=None)->list:
 
     else:
         stmt = select(
-            WorksStudent.id_work.label("id_work"),
+            WorksStudent.id.label("id_work"),
             WorksStudent.id_student.label("id_student"),
             Student.name.label("name_student"),
             Group.name.label("group_name"),
-                ).join(WorksStudent, WorksStudent.id_student == Student.telegram_id
+                ).join(WorksStudent, Student.telegram_id==WorksStudent.id_student
                 ).join(Works, WorksStudent.id_work == Works.id
                 ).join(Group, Student.id_group==Group.id
                 ).where(WorksStudent.accept == None,Works.id_discipline == discipline_id
