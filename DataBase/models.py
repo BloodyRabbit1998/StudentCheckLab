@@ -1,5 +1,4 @@
-from sqlalchemy import (
-                        String,
+from sqlalchemy import (String,
                         Date,
                         Boolean,
                         Integer,

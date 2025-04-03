@@ -372,3 +372,14 @@ async def msg_reject(msg:Message, state:FSMContext, bot:Bot):
 Статус: ❌ Не принята
 Комментарий {msg.text}""")
     msg.answer()
+
+@router.message(AdminFilter(),F.text=="Отчет 📠")
+async def report(msg:Message, state:FSMContext):
+    await msg.answer("Выберите дисциплину:", reply_markup=await kb_return_discipline("discipline report"))
+    await state.set_state(Report.choice_discipline)
+@router.callback_query(F.data.regexp(r"discipline report \d+"))
+async def callback_discipline(call:types.CallbackQuery, state:FSMContext):
+    discipline_id=int(call.data.split()[-1])
+    await state.update_data(discipline_id=discipline_id)
+    await call.message.answer("Выберите группу:", reply_markup=await kb_return_group("group report"))
+    await state.set_state(Report.choice_group)

@@ -20,3 +20,6 @@ class CheckWork(StatesGroup):
     choice_student=State()
     choice_work=State()
     check_work=State()
+class Report(StatesGroup):
+    choice_discipline=State()
+    choice_group=State()

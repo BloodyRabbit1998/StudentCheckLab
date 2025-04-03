@@ -57,8 +57,11 @@ async def kb_return_discipline(call_text:str):
                                                       callback_data=f"{call_text} {discipline.id}")] 
                                                       for discipline in await db.return_all("discipline")])
     return kb 
-async def kb_return_group(call_text:str):
-    kb=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=group.name, callback_data=f"{call_text} {group.id}")] for group in await db.return_all("group")])
+async def kb_return_group(call_text:str,discipline_id:int=None):
+    if discipline_id:
+        pass
+    else:
+        kb=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=group.name, callback_data=f"{call_text} {group.id}")] for group in await db.return_all("group")])
     return kb
 async def kb_return_disciplin_id(call_text:str,id_student:int):
     student=await db.return_student(id_student)
