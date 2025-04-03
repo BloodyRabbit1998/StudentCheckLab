@@ -84,7 +84,7 @@ async def add(table:str,data:list[tuple])->list:
                 await update_col("works_student",(work[0].id,id_student,id_work,date_of_delivery,path,True if work[0].accept else None))
     async with SESSION() as db:  
         if rows:
-            await db.add_all(rows)
+            db.add_all(rows)
             await db.commit()
     return rows
 async def delete_col(table:str,ids:int|list[int])->None:
