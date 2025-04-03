@@ -33,8 +33,9 @@ async def start_handler(msg:Message,state:FSMContext):
     await msg.answer(msg_admin_start)  
 @router.message(AdminFilter(),Command('menu'))
 @router.message(AdminFilter(),F.text=="menu")
-async def menu(msg:Message):
+async def menu(msg:Message,state:State):
     global edit_table
+    await state.clear() 
     await msg.answer(f"Админ панель",reply_markup=kb_admin_main) 
     edit_table=False
 @router.message(Command('id'))
@@ -57,7 +58,7 @@ async def edir_table_status(msg:Message,state:FSMContext):
     else:
         await msg.answer("Вы вышли из режима изменения базы данных")
         await state.clear()
-        await menu(msg)
+        await menu(msg,state)
 @router.message(AdminFilter(),Table.choice_table)
 async def table(msg:Message,state:FSMContext):
     await state.update_data(choice_table=msg.text)
@@ -67,7 +68,7 @@ async def table(msg:Message,state:FSMContext):
     if msg.text=="Назад":
         await msg.answer("Вы вышли из режима изменения базы данных")
         await state.clear()
-        await menu(msg)
+        await menu(msg,state)
     elif msg.text in kbs:
         await msg.answer(f"""
     Вы выбрали таблицу "{msg.text}"
@@ -79,7 +80,7 @@ async def table(msg:Message,state:FSMContext):
 async def set_operation(msg:Message, state:FSMContext):
     await state.update_data(choice_operation=msg.text)
     if msg.text=="Назад":
-        await menu(msg)
+        await menu(msg,state)
     elif msg.text in ["Добавить работу","Просмотреть работы","Изменить работу"]:
         await msg.answer("Выберите дисциплину:",reply_markup=await kb_return_discipline("discipline sel work"))
         await msg.answer("",reply_markup=ReplyKeyboardRemove())
