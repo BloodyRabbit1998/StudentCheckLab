@@ -10,6 +10,7 @@ class Table(StatesGroup):
     set_data=State()
     repite=State()
     document=State()
+    get_work=State()
 class AddWork(StatesGroup):
     choice_discipline=State()
     choice_work=State()

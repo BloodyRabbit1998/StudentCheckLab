@@ -48,7 +48,7 @@ async def return_work(id:int,**kwargs)->list[Works]:
     async with SESSION() as db:
         rows=await db.scalars(stmt)
     logging.debug(rows)
-    return [row for row in rows]
+    return [row for row in rows] if kwargs else [row for row in rows][-1]
 
 async def check_work(id_student:int,id_work:int)->list[WorksStudent]:
     async with SESSION() as db:
@@ -81,10 +81,10 @@ async def add(table:str,data:list[tuple])->list:
             if not work:
                 rows.append(WorksStudent(id_student=id_student,id_work=id_work,date_of_delivery=date_of_delivery,path=path,accept=accept))
             else:
-                await update_col("works_student",(work[0].id,id_student,id_work,date_of_delivery,path,accept))
+                await update_col("works_student",(work[0].id,id_student,id_work,date_of_delivery,path,True if work[0].accept else None))
     async with SESSION() as db:  
         if rows:
-            db.add_all(rows)
+            await db.add_all(rows)
             await db.commit()
     return rows
 async def delete_col(table:str,ids:int|list[int])->None:
@@ -115,7 +115,7 @@ async def delete_col(table:str,ids:int|list[int])->None:
             stmts=[delete(WorksStudent).where(WorksStudent.id==id) for id in ids]
     async with SESSION() as db:
         for stmt in stmts:
-            db.execute(stmt) 
+            await db.execute(stmt) 
             await db.commit()
 async def update_col(table:str,data:tuple)->None:
     """
@@ -146,6 +146,22 @@ async def update_col(table:str,data:tuple)->None:
             await db.execute(stmt)
             logging.info("Обновлен!")
             await db.commit()
+async def accept_work(id:int, accept:bool):
+    stmt=update(WorksStudent).where(WorksStudent.id==id).values(accept=accept)
+    async with SESSION() as db:
+        await db.execute(stmt)
+        await db.commit()
+async def return_work_accept(id):
+    stmt=select(Works.name.label("work_name"),
+                Discipline.name.label("discipline_name"),
+                WorksStudent.path.label("path ")
+                ).join(Discipline,Works.id_discipline==Discipline.id
+                ).join(WorksStudent,Works.id==WorksStudent.id_work
+    ).where(WorksStudent.id==id)
+    async with SESSION() as db:
+        rows=await db.execute(stmt)
+    logging.debug("получены данные работы студента!")
+    return [row for row in rows][-1]
 async def return_all(table:str)->list:
     if table=="student":
         stmt=select(Student)
@@ -160,54 +176,55 @@ async def return_all(table:str)->list:
     async with SESSION() as db:
         return [row for row in await db.scalars(stmt)]
 async def retutn_works_student_all(id_student:int, id_discipline:int=None)->list:
-    if id_discipline:
-        stmt=select(
-            WorksStudent.id,Works.name,WorksStudent.accept
-            ).join(Works,WorksStudent.id_work==Works.id
-            ).where(WorksStudent.id_student==id_student,Works.id_discipline==id_discipline)
-    else:
-        stmt=select(WorksStudent.id).where(WorksStudent.id_student==id_student)
+    stmt=select(
+        WorksStudent.id.label("id"),
+        Works.name.label("name_work"),
+        WorksStudent.accept.label("accept")
+        ).join(Works,WorksStudent.id_work==Works.id
+        ).where(WorksStudent.id_student==id_student,Works.id_discipline==id_discipline if id_discipline else True)
     async with SESSION() as db:
         rows=await db.execute(stmt)
     logging.debug("получены данные работ студентов!")
     return [row for row in rows]
 
-async def return_student_work_none(discipline_id:int,id_student:int=None)->list:
-    """ if id_student:  
-            return id_work,name_student,group.name,count
-        else:
-            return """
-    if id_student:
+async def return_student_work_none(discipline_id:int,id_work:int=None)->list:
+    if id_work:
         stmt = select(
+            WorksStudent.id.label("id"),
             WorksStudent.id_work.label("id_work"),
+            WorksStudent.path.label("path"),
+            WorksStudent.id_student.label("id_student"),
             Works.name.label("name_work"), 
-                ).join(WorksStudent, WorksStudent.id_student == Student.telegram_id
                 ).join(Works, WorksStudent.id_work == Works.id
-                ).join(Group, Student.id_group==Group.id
-                ).where(Works.id_discipline == discipline_id,
-                        WorksStudent.accept == None,
-                        Student.telegram_id == id_student
-                ).group_by(Student.name, WorksStudent.id_work
-                ).order_by(Student.name)
+                ).where(WorksStudent.id == id_work,
+                        Works.id_discipline == discipline_id,
+                ).order_by(Works.name)
 
     else:
         stmt = select(
             WorksStudent.id_work.label("id_work"),
+            WorksStudent.id_student.label("id_student"),
             Student.name.label("name_student"),
             Group.name.label("group_name"),
-            func.count(WorksStudent.id_work).label("count")
                 ).join(WorksStudent, WorksStudent.id_student == Student.telegram_id
                 ).join(Works, WorksStudent.id_work == Works.id
                 ).join(Group, Student.id_group==Group.id
-                ).where(WorksStudent.accept == None
-                ).where(Works.id_discipline == discipline_id
+                ).where(WorksStudent.accept == None,Works.id_discipline == discipline_id
                 ).order_by(Student.name)
-
     async with SESSION() as db:
         rows=await db.execute(stmt)
     logging.debug("получены данные работ студентов!")
-    return [row for row in rows]
-
+    if id_work:
+        results=[{"id":row.id,"name_work":row.name_work,"path":row.path,"id_student":row.id_student,"name_work":row.name_work}
+        for row in rows]
+    else:
+        results={}
+        for id_work,id_student,name_student,group_name in rows:
+            if  id_student not in results:
+                results[id_student]={"works":[id_work],"name":name_student,"group":group_name}
+            else:
+                results[id_student]["works"]+=[id_work]
+    return results
 if __name__=="__main__":
     with SESSION() as db:
         print(db.query(Student).all())

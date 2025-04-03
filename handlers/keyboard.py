@@ -68,18 +68,14 @@ async def kb_return_disciplin_id(call_text:str,id_student:int):
 async def kb_return_student_works(id_student,id_discipline,call_text:str):
     data=await db.retutn_works_student_all(id_student, id_discipline)
     status={True:"✅",False:"❌",None:"🕖"}
-    def r_work(work):
-        work=work[-1]   
-        return work.name
     kb=InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=f'{r_work(await db.return_work(row.id))} {status[row.accept]}', callback_data=f"{call_text} {row.id}")] for row in data])
+        [InlineKeyboardButton(text=f"{name} {status[accept]}", callback_data=f"{call_text} {id}")] for id,name,accept in data])
     return kb
 async def kb_retutn_students_work(id_discipline:int,call_text:str):
     data=await db.return_student_work_none(id_discipline)
     kb=InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=f'{shorten_name(row.name_student)}({row.group_name})-{row.count}', callback_data=f"{call_text} {row.id_work}")] for row in data])
-    
-    return kb
+        [InlineKeyboardButton(text=f'{shorten_name(data[id_student]["name"])}({data[id_student]["group"]})-{len(data[id_student]["works"])}', callback_data=f"{call_text} {id_student}")] for id_student in data])
+    return kb,data
 
 def shorten_name(full_name):
     parts = full_name.split()

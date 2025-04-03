@@ -3,9 +3,10 @@ from aiogram.types import ( InlineKeyboardButton,
                             KeyboardButton, 
                             ReplyKeyboardMarkup, 
                             ReplyKeyboardRemove,
+                            Message
                             )
 from aiogram import F, Router, types,Bot
-from aiogram.types import Message
+from aiogram.types.input_file import FSInputFile 
 from aiogram.filters import Command,CommandStart,BaseFilter
 from config import ADMINS
 import DataBase.request as db
@@ -13,7 +14,7 @@ from aiogram.fsm.context import FSMContext
 from states import *
 from pathlib import Path
 from .keyboard import *
-
+import logging
 router=Router()
 edit_table=False
 
@@ -57,7 +58,7 @@ async def edir_table_status(msg:Message,state:FSMContext):
         await msg.answer("Вы вышли из режима изменения базы данных")
         await state.clear()
         await menu(msg)
-@router.message(Table.choice_table)
+@router.message(AdminFilter(),Table.choice_table)
 async def table(msg:Message,state:FSMContext):
     await state.update_data(choice_table=msg.text)
     kbs={"Работы":kb_admin_works,
@@ -74,7 +75,7 @@ async def table(msg:Message,state:FSMContext):
                               """, reply_markup= kbs[msg.text])
         await state.set_state(Table.choice_operation)
 
-@router.message(Table.choice_operation)
+@router.message(AdminFilter(),Table.choice_operation)
 async def set_operation(msg:Message, state:FSMContext):
     await state.update_data(choice_operation=msg.text)
     if msg.text=="Назад":
@@ -152,7 +153,7 @@ async def set_data(msg:Message, state:FSMContext):
     elif operation['choice_operation']=="Изменить работу" and "set_col" in operation:
         if operation["set_col"]=="Название":
             work=await db.return_work(operation["work_id"])
-            await db.update_col("works", (operation['work_id'], msg.text,operation["discipline_id"],work[-1].path))
+            await db.update_col("works", (operation['work_id'], msg.text,operation["discipline_id"],work.path))
         elif operation["set_col"]=="Документ":
             await msg.answer("Отправьте документ:", reply_markup="")
             await state.set_state(Table.document)
@@ -245,8 +246,9 @@ async def callback_work(call:types.CallbackQuery,state:FSMContext):
     data=await state.get_data()
     if data["choice_operation"]=="Просмотреть работы":
         await call.message.answer("Список работ:",
-                         reply_markup=await kb_return_works(discipline_id,"view lab")
+                         reply_markup=await kb_return_works(discipline_id,"student get work")
                         )
+        await state.set_state(Table.get_work)
     elif data["choice_operation"]=="Добавить работу":
         await call.message.answer("Введите название работы:",reply_markup= ReplyKeyboardRemove())
         await state.set_state(Table.set_data)
@@ -276,7 +278,7 @@ async def add_document(msg:Message,state:FSMContext,bot:Bot):
     await bot.download(file=msg.document, destination=path)
     if "set_col" in data:
         work=await db.return_work(data['work_id'])
-        await db.update_col("works", (data['work_id'], work[-1].name, data['discipline_id'],str(path)))
+        await db.update_col("works", (data['work_id'], work.name, data['discipline_id'],str(path)))
         await msg.answer("Работа обновлена!",reply_markup=kb_admin_works)
         await state.clear()
         await state.set_state(Table.choice_operation)
@@ -318,7 +320,56 @@ async def view_works(msg:Message, state:FSMContext):
 @router.callback_query(CheckWork.choice_discipline,F.data.regexp(r"discipline check work \d+"))
 async def callback_work(call:types.CallbackQuery, state:FSMContext):
     discipline_id=int(call.data.split()[-1])
-    
-    await state.update_data(discipline_id=discipline_id)
-    await call.message.answer("Работы по дисциплине", reply_markup=await kb_retutn_students_work( discipline_id,"student check work"))
+    kb,data=await kb_retutn_students_work( discipline_id,"student check work")
+    await state.update_data(discipline_id=discipline_id,student=data)
+    await call.message.answer("Работы по дисциплине", reply_markup=kb )
     await state.set_state(CheckWork.choice_student)
+@router.callback_query(CheckWork.choice_student, F.data.regexp(r"student check work \d+"))
+async def callback_work(call:types.CallbackQuery, state:FSMContext,bot:Bot):
+    id_student=int(call.data.split()[-1])
+    data=await state.get_data()
+    id_disciplite=data["discipline_id"]
+    data=data["student"]
+    await call.message.answer(f"Работы студента {data[id_student]['name']}({data[id_student]['group']}):")
+    for work in data[id_student]["works"]:
+        row=await db.return_student_work_none(id_disciplite,work)
+        row=row[-1]
+        file_input = FSInputFile(row["path"])
+        await bot.send_document(call.message.chat.id,file_input ,
+                caption=f"{row['name_work']}",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Принять", callback_data=f"accept {row['id']} {row['id_student']}"),
+        InlineKeyboardButton(text="❌ Не принять", callback_data=f"reject {row['id']} {row['id_student']}")]
+    ]))
+    logging.debug("Отправлены работы!")
+@router.callback_query(F.data.regexp(r"accept \d+ \d+"))
+async def callback_accept(call:types.CallbackQuery, state:FSMContext,bot:Bot):
+    id_work,id_student=map(int,call.data.split()[1:])
+    await db.accept_work(id_work,True)
+    #await call.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+    #    [InlineKeyboardButton(text="✅ Принято", callback_data=f"")]]))
+    data=await db.return_work_accept(id_work)
+    work_name,discipline_name,path=data
+    await bot.send_message(chat_id=id_student, text=f"Дисциплина: {discipline_name}\nРабота: {work_name}\nСтатус: ✅ Принята")
+    await call.answer()
+@router.callback_query(F.data.regexp(r"reject \d+ \d+"))
+async def callback_reject(call:types.CallbackQuery, state:FSMContext, bot:Bot):
+    id_work,id_student=map(int, call.data.split()[1:])
+    await state.update_data(id_work=id_work,id_student=id_student)
+    await db.accept_work(id_work, False)
+    await call.message.answer("Введите комменторий к работе:")
+    await state.set_state(CheckWork.check_work)
+@router.message(AdminFilter,CheckWork.check_work)
+async def msg_reject(msg:Message, state:FSMContext, bot:Bot):
+    data=await state.get_data()
+    id_work,id_student=data["id_work"],data["id_student"]    
+    data=await db.return_work_accept(id_work)
+    work_name,discipline_name,path=data
+    await bot.send_message(chat_id=id_student, text=f"Дисциплина: {discipline_name}\nРабота: {work_name}\nСтатус: ❌ Не принята")
+    await bot.send_document(chat_id=id_student, document=FSInputFile(path), 
+        caption=f"""f
+Дисциплина: {discipline_name}
+Работа: {work_name}
+Статус: ❌ Не принята
+Комментарий {msg.text}""")
+    msg.answer()

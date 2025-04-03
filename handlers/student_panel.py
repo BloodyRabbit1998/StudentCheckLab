@@ -84,7 +84,7 @@ async def add_document(msg:Message,state:FSMContext,bot:Bot):
     path= Path(__file__).parent.parent /"files"/"documents"/"works students"/f"{group.name}"/disc[-1].name/student[-1].name
     path=path.resolve()
     path.mkdir(parents=True, exist_ok=True)
-    path/=f'{work[-1].name}.{msg.document.file_name.split(".")[-1] if "." in msg.document.file_name else "file"}'
+    path/=f'{work.name}.{msg.document.file_name.split(".")[-1] if "." in msg.document.file_name else "file"}'
     path=path.resolve()
     await bot.download(file=msg.document, destination=path)
     await db.add("works_student", [(msg.from_user.id, data['work_id'],datetime.now(),str(path),None)])
@@ -103,20 +103,20 @@ async def callback_discipline(call:types.CallbackQuery, state:FSMContext):
     await state.update_data(discipline_id=discipline_id)
     await call.message.answer("Выберите работу:", reply_markup=await kb_return_works(discipline_id, "student get work"))
     await state.set_state(AddWork.choice_work)
+@router.callback_query(F.data.regexp(r"student get work \d+"),Table.get_work)
 @router.callback_query(F.data.regexp(r"student get work \d+"), AddWork.choice_work)
 async def callback_document(call:types.CallbackQuery, state:FSMContext,bot:Bot):
     work_id=int(call.data.split()[-1])
-    await state.update_data(work_id=work_id)
-    data=await state.get_data()
-    work=await db.return_work(data['work_id'])
-    if work[-1].path:
-        file_input = FSInputFile(work[-1].path)
+    work=await db.return_work(work_id)
+    if work.path:
+        file_input = FSInputFile(work.path)
         await bot.send_document(
             call.message.chat.id, file_input,
-            caption=f'{work[-1].name}')
+            caption=f'{work.name}')
     else:
         await call.message.answer("Файл не загружен!")
-
+    await state.clear()
+    await state.set_state(Table.choice_operation)
 @router.message(F.text=="Список моих работ")
 async def get_work(msg:Message, state:FSMContext):
     await state.clear()
