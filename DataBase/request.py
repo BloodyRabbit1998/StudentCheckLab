@@ -202,7 +202,7 @@ async def return_student_work_none(discipline_id:int,id_work:int=None)->list:
 
     else:
         stmt = select(
-            WorksStudent.id.label("id_work"),
+            WorksStudent.id_work.label("id_work"),
             WorksStudent.id_student.label("id_student"),
             Student.name.label("name_student"),
             Group.name.label("group_name"),
