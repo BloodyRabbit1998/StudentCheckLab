@@ -1,9 +1,4 @@
-from sqlalchemy import (String,
-                        Date,
-                        Boolean,
-                        Integer,
-                        BigInteger,
-                        ForeignKey)
+from sqlalchemy import String,Date,Boolean,Integer,BigInteger,ForeignKey
 from sqlalchemy.orm import (DeclarativeBase,
                             Mapped,
                             mapped_column,
