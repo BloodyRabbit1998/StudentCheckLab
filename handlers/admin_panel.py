@@ -359,15 +359,14 @@ async def callback_reject(call:types.CallbackQuery, state:FSMContext, bot:Bot):
     await db.accept_work(id_work, False)
     await call.message.answer("Введите комменторий к работе:")
     await state.set_state(CheckWork.check_work)
-@router.message(AdminFilter,CheckWork.check_work)
+@router.message(AdminFilter(),CheckWork.check_work)
 async def msg_reject(msg:Message, state:FSMContext, bot:Bot):
     data=await state.get_data()
     id_work,id_student=data["id_work"],data["id_student"]    
     data=await db.return_work_accept(id_work)
     work_name,discipline_name,path=data
-    await bot.send_message(chat_id=id_student, text=f"Дисциплина: {discipline_name}\nРабота: {work_name}\nСтатус: ❌ Не принята")
     await bot.send_document(chat_id=id_student, document=FSInputFile(path), 
-        caption=f"""f
+        caption=f"""
 Дисциплина: {discipline_name}
 Работа: {work_name}
 Статус: ❌ Не принята
