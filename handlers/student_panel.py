@@ -43,10 +43,10 @@ async def callback_group(call:types.CallbackQuery, state:FSMContext):
     data=await state.get_data()
     if await db.return_student(call.from_user.id):
         await db.update_col("student", (call.from_user.id, data['name'], group_id))
-        await call.message.answer("Вы успешно обновили данные!")
+        await call.message.edit_text("Вы успешно обновили данные!",reply_markup=None)
     else:  
         await db.add("student", [(call.from_user.id,data['name'], data['group_id'] )])
-        await call.message.answer("Вы успешно зарегестрированы!")
+        await call.message.edit_text("Вы успешно зарегестрированы!",reply_markup=None)
     await state.clear()
     await menu(call.message)
 @router.message(Command("registration"))
@@ -62,7 +62,7 @@ async def send_work(msg:Message, state:FSMContext):
 async def callback_discipline(call:types.CallbackQuery, state:FSMContext):
     discipline_id=int(call.data.split()[-1])
     await state.update_data(discipline_id=discipline_id)
-    await call.message.answer("Выберите работу:", reply_markup=await kb_return_works(discipline_id,"student sel work"))
+    await call.message.edit_text("Выберите работу:", reply_markup=await kb_return_works(discipline_id,"student sel work"))
     await state.set_state(AddWork.choice_work)
 @router.callback_query(F.data.regexp(r"student sel work \d+"),AddWork.choice_work)
 async def callback_discipline(call:types.CallbackQuery, state:FSMContext):
@@ -101,7 +101,7 @@ async def get_work(msg:Message, state:FSMContext):
 async def callback_discipline(call:types.CallbackQuery, state:FSMContext):
     discipline_id=int(call.data.split()[-1])
     await state.update_data(discipline_id=discipline_id)
-    await call.message.answer("Выберите работу:", reply_markup=await kb_return_works(discipline_id, "student get work"))
+    await call.message.edit_text("Выберите работу:", reply_markup=await kb_return_works(discipline_id, "student get work"))
     await state.set_state(AddWork.choice_work)
 @router.callback_query(F.data.regexp(r"student get work \d+"),Table.get_work)
 @router.callback_query(F.data.regexp(r"student get work \d+"), AddWork.choice_work)
@@ -114,7 +114,7 @@ async def callback_document(call:types.CallbackQuery, state:FSMContext,bot:Bot):
             call.message.chat.id, file_input,
             caption=f'{work.name}')
     else:
-        await call.message.answer("Файл не загружен!")
+        await call.message.edit_text("Ошибка загрузки!",reply_markup=None)
     await state.clear()
     await state.set_state(Table.choice_operation)
 @router.message(F.text=="Список моих работ")
@@ -126,7 +126,7 @@ async def get_work(msg:Message, state:FSMContext):
 async def callback_discipline(call:types.CallbackQuery, state:FSMContext):
     discipline_id=int(call.data.split()[-1])
     await state.update_data(discipline_id=discipline_id)
-    await call.message.answer("✅ - работа принята\n❌-работа не принята\n🕖-работа на расмотрении\nСписок работ:", 
+    await call.message.edit_text("✅ - работа принята\n❌-работа не принята\n🕖-работа на расмотрении\nСписок работ:", 
                               reply_markup=await kb_return_student_works(call.from_user.id, discipline_id,"work student"))
     await state.clear()
     await menu(call.message)
@@ -150,6 +150,6 @@ async def get_work(call:types.CallbackQuery,bot:Bot):
                 call.message.chat.id, file_input,
                 caption=f'Отчет к Лабораторной работе')
         else:
-            await call.message.answer("Не известная команда!")
+            await call.message.edit_text("Не известная команда!",reply_markup=None)
     except Exception as e:
-        await call.message.answer("Запрашиваемый файл не обнаружен!")
+        await call.message.edit_text("Запрашиваемый файл не обнаружен!",reply_markup=None)
