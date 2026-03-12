@@ -236,7 +236,7 @@ async def callback_discipline(call:types.CallbackQuery,state:FSMContext):
 async def callback_del_discipline(call:types.CallbackQuery,state:FSMContext):
     discipline_id=int(call.data.split()[-1])
     await state.update_data(discipline_id=discipline_id)
-    await call.message.answer("Уверены что хотите удалить?",reply_markup=InlineKeyboardMarkup(inline_keyboard=
+    await call.message.edit_text("Уверены что хотите удалить?",reply_markup=InlineKeyboardMarkup(inline_keyboard=
                             [
                                 [InlineKeyboardButton(text="Да ✅", callback_data=f"choice yes"),InlineKeyboardButton(text="Нет ❌", callback_data=f"choice no") ] ])
                         )
@@ -246,15 +246,15 @@ async def callback_work(call:types.CallbackQuery,state:FSMContext):
     await state.update_data(discipline_id=discipline_id)
     data=await state.get_data()
     if data["choice_operation"]=="Просмотреть работы":
-        await call.message.answer("Список работ:",
+        await call.message.text_edit("Список работ:",
                          reply_markup=await kb_return_works(discipline_id,"student get work")
                         )
         await state.set_state(Table.get_work)
     elif data["choice_operation"]=="Добавить работу":
-        await call.message.answer("Введите название работы:",reply_markup= ReplyKeyboardRemove())
+        await call.message.edit_text("Введите название работы:",reply_markup= ReplyKeyboardRemove())
         await state.set_state(Table.set_data)
     elif data["choice_operation"]=="Изменить работу":
-        await call.message.answer("Выберите работу для изменения:", reply_markup= await kb_return_works(discipline_id, "work update"))
+        await call.message.edit_text("Выберите работу для изменения:", reply_markup= await kb_return_works(discipline_id, "work update"))
 
 @router.message(Table.document,F.text.in_(["Добавить документ","Не добавлять документ"]))
 async def add_work(msg:Message,state:FSMContext):
@@ -292,7 +292,7 @@ async def add_document(msg:Message,state:FSMContext,bot:Bot):
 async def callback_del_work(call:types.CallbackQuery, state:FSMContext):
     work_id=int(call.data.split()[-1])
     await state.update_data(work_id=work_id)
-    await call.message.answer("Уверены что хотите удалить?",reply_markup=InlineKeyboardMarkup(inline_keyboard=
+    await call.message.edit_text("Уверены что хотите удалить?",reply_markup=InlineKeyboardMarkup(inline_keyboard=
                             [
                                 [InlineKeyboardButton(text="Да ✅", callback_data=f"choice yes"),InlineKeyboardButton(text="Нет ❌", callback_data=f"choice no") ] ])
                         )
@@ -301,7 +301,7 @@ async def callback_del_work(call:types.CallbackQuery, state:FSMContext):
 async def callback_update_work(call:types.CallbackQuery, state:FSMContext):
     work_id=int(call.data.split()[-1])
     await state.update_data(work_id=work_id)
-    await call.message.answer("Выберите что хотите изменить",reply_markup=ReplyKeyboardMarkup(
+    await call.message.edit_text("Выберите что хотите изменить",reply_markup=ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text="Название"),KeyboardButton(text="Файл")],
                    [KeyboardButton(text="Отмена")]],
         resize_keyboard=True
@@ -311,7 +311,7 @@ async def callback_update_work(call:types.CallbackQuery, state:FSMContext):
 async def update_disc(call:types.CallbackQuery, state:FSMContext):
     discipline_id=int(call.data.split()[-1])
     await state.update_data(discipline_id=discipline_id)
-    await call.message.answer("Введите обновленное название дисциплины:", reply_markup=ReplyKeyboardRemove())
+    await call.message.edit_text("Введите обновленное название дисциплины:", reply_markup=ReplyKeyboardRemove())
     await state.set_state(Table.set_data)
 
 """-------------------Проверка работ студентов------------------"""
