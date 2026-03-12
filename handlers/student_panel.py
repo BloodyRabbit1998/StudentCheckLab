@@ -15,6 +15,7 @@ from aiogram.types import ( InlineKeyboardButton,
                             )
 from pathlib import Path
 from datetime import datetime
+
 router=Router()
 @router.message(CommandStart())
 @router.message(Command('start'),F.text.in_(["start","Start","Старт"]))

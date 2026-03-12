@@ -197,6 +197,7 @@ async def return_student_work_none(discipline_id:int,id_work:int=None)->list:
             Works.name.label("name_work"), 
                 ).join(Works, WorksStudent.id_work == Works.id
                 ).where(WorksStudent.id == id_work,
+                ).group_by(WorksStudent.id
                 ).order_by(Works.name)
     else:
         stmt = select(

@@ -20,8 +20,8 @@ msg_student_start="""
         """
 kb_admin_main=ReplyKeyboardMarkup(keyboard=[
                                 [KeyboardButton(text="Редактирование таблиц 🧾"), KeyboardButton(text="Просмотреть работы 🔎")],
-                                [ KeyboardButton(text="Отчет 📠"), KeyboardButton(text="Список услуг 🧾")],
-                                [ KeyboardButton(text="Список услуг 🧾")]],
+                                [ KeyboardButton(text="Отчет 📠"), KeyboardButton(text="Сообщение группе🧾")],
+                                [ KeyboardButton(text="В разработке ... 🧾")]],
                                 resize_keyboard=True)                    
 kb_student_main=ReplyKeyboardMarkup(keyboard=[
                                 [KeyboardButton(text="Сдать работу🧾"), KeyboardButton(text="Список моих работ")],
@@ -77,7 +77,7 @@ async def kb_return_student_works(id_student,id_discipline,call_text:str):
 async def kb_retutn_students_work(id_discipline:int,call_text:str):
     data=await db.return_student_work_none(id_discipline)
     kb=InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=f'{shorten_name(data[id_student]["name"])}({data[id_student]["group"]})-{len(data[id_student]["works"])}', callback_data=f"{call_text} {id_student}")] for id_student in data])
+        [InlineKeyboardButton(text=f'{shorten_name(data[id_student]["name"])}({data[id_student]["group"]})-{data[id_student]["count_work"]}', callback_data=f"{call_text} {id_student}")] for id_student in data])
     return kb,data
 
 def shorten_name(full_name):

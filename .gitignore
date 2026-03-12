@@ -2,3 +2,16 @@
 **/documents/*
 !files/documents/templates/*
 **/db.sqlite3
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+*.log
+instance
+.vscode
+.DS_Store
+.idea
+*.iml  
+.mypy_cache
+.pytest_cache

@@ -182,21 +182,21 @@ async def repite(msg:Message, state:FSMContext):
         await msg.answer("Неверная команда!")
         await state.set_state(Table.repite)
 @router.callback_query(F.data.regexp(r"discipline \d+"))
-async def callback_group(msg:Message, state:FSMContext):
-    await msg.answer("Введите название дисциплины:")
-    await state.update_data(group_id=msg.text.split()[1])
+async def callback_group(call:types.CallbackQuery, state:FSMContext):
+    await call.message.edit_text("Введите название дисциплины:",reply_markup=ReplyKeyboardRemove())
+    await state.update_data(group_id=call.data.split()[1])
     await state.set_state(Table.set_data)
 @router.callback_query(F.data.regexp(r"group \d+"))
 async def callback_info_group(call:types.CallbackQuery,state:FSMContext):
     group_id=int(call.data.split()[-1])
     await state.update_data(group_id=group_id) 
-    await call.message.answer(f"Введите обновленное название группы:",reply_markup=ReplyKeyboardRemove())
+    await call.message.edit_text(f"Введите обновленное название группы:",reply_markup=ReplyKeyboardRemove())
     await state.set_state(Table.set_data)
 @router.callback_query(F.data.regexp(r'group del \d+'))
 async def callback_del_group(call:types.CallbackQuery,state:FSMContext):
     group_id=int(call.data.split()[-1])
     await state.update_data(group_id=group_id)
-    await call.message.answer("Уверены что хотите удалить?",reply_markup=InlineKeyboardMarkup(inline_keyboard=
+    await call.message.edit_text("Уверены что хотите удалить?",reply_markup=InlineKeyboardMarkup(inline_keyboard=
                             [
                                 [InlineKeyboardButton(text="Да ✅", callback_data=f"choice yes"),InlineKeyboardButton(text="Нет ❌", callback_data=f"choice no") ] ])
                         )
@@ -206,18 +206,18 @@ async def callback_del_group(call:types.CallbackQuery, state:FSMContext):
         operation=await state.get_data()
         if operation["choice_operation"]=="Удалить группу":
             await db.delete_col("group", operation['group_id'])
-            await call.message.answer("Группа удалена!")
+            await call.message.edit_text("Группа удалена!",reply_markup=ReplyKeyboardRemove())
         elif operation["choice_operation"]=="Удалить дисциплину":
             await db.delete_col("discipline", operation['discipline_id'])
-            await call.message.answer("Дисциплина удалена!")
+            await call.message.edit_text("Дисциплина удалена!",reply_markup=ReplyKeyboardRemove())
         elif operation["choice_operation"]=="Удалить работу":
             await db.delete_col("works", operation['work_id'])
-            await call.message.answer("Работа удалена!")
+            await call.message.edit_text("Работа удалена!",reply_markup=ReplyKeyboardRemove())
         elif operation["choice_operation"]=="Удалить работу студента":
             await db.delete_col("works_student", operation['works_student_id'])
-            await call.message.answer("Работа студента удалена!")
+            await call.message.edit_text("Работа студента удалена!",reply_markup=ReplyKeyboardRemove())
     else:
-        await call.message.answer("Группа не удалена!")
+        await call.message.edit_text("Группа не удалена!",reply_markup=ReplyKeyboardRemove())
     await state.clear()
 @router.callback_query(F.data.regexp(r'discipline group \d+'))
 async def callback_discipline(call:types.CallbackQuery,state:FSMContext):
@@ -225,7 +225,7 @@ async def callback_discipline(call:types.CallbackQuery,state:FSMContext):
     data=await state.get_data()
     group=await db.return_group(group_id)
     await state.update_data(group_id=group_id)
-    await call.message.answer(f"""
+    await call.message.edit_text(f"""
     Дисциплина:{data["set_data"]}
     Группа:{group.name}
     """,reply_markup=ReplyKeyboardRemove())
@@ -313,6 +313,9 @@ async def update_disc(call:types.CallbackQuery, state:FSMContext):
     await state.update_data(discipline_id=discipline_id)
     await call.message.answer("Введите обновленное название дисциплины:", reply_markup=ReplyKeyboardRemove())
     await state.set_state(Table.set_data)
+
+"""-------------------Проверка работ студентов------------------"""
+
 @router.message(AdminFilter(),F.text=='Просмотреть работы 🔎')
 async def view_works(msg:Message, state:FSMContext):
     await msg.answer("Выберите дисциплину:", reply_markup=await kb_return_discipline("discipline check work"))
@@ -323,7 +326,7 @@ async def callback_work(call:types.CallbackQuery, state:FSMContext):
     discipline_id=int(call.data.split()[-1])
     kb,data=await kb_retutn_students_work( discipline_id,"student check work")
     await state.update_data(discipline_id=discipline_id,student=data)
-    await call.message.answer("Работы по дисциплине", reply_markup=kb )
+    await call.message.edit_text("Работы по дисциплине", reply_markup=kb )
     await state.set_state(CheckWork.choice_student)
 @router.callback_query(CheckWork.choice_student, F.data.regexp(r"student check work \d+"))
 async def callback_work(call:types.CallbackQuery, state:FSMContext,bot:Bot):
