@@ -82,30 +82,43 @@ async def set_operation(msg:Message, state:FSMContext):
     if msg.text=="Назад":
         await menu(msg,state)
     elif msg.text in ["Добавить работу","Просмотреть работы","Изменить работу"]:
+        load=await msg.answer("Загрузка ...",reply_markup=ReplyKeyboardRemove())
         await msg.answer("Выберите дисциплину:",reply_markup=await kb_return_discipline("discipline sel work"))
-        await msg.answer("",reply_markup=ReplyKeyboardRemove())
+        await load.delete()
     elif msg.text=="Удалить работу":
         await msg.answer("В разработке...")
     elif msg.text=="Добавить группу":
         await msg.answer("Введите название группы:",reply_markup=ReplyKeyboardRemove())
         await state.set_state(Table.set_data)
     elif msg.text=="Просмотреть группы":
+        load=await msg.answer("Загрузка ...",reply_markup=ReplyKeyboardRemove())
         await msg.answer("Список групп:",reply_markup=await kb_return_group("info group"))
+        await load.delete()
         state.set_state(Table.choice_operation)
     elif msg.text=="Изменить группу":
+        load=await msg.answer("Загрузка ...",reply_markup=ReplyKeyboardRemove())
         await msg.answer("Выберите группу и введите измененное имя",
                          reply_markup=await kb_return_group("group"))  
+        await load.delete()
     elif msg.text=="Удалить группу":
+        load=await msg.answer("Загрузка ...",reply_markup=ReplyKeyboardRemove())
         await msg.answer("Нажмите группу для удаления:",reply_markup=await kb_return_group("group del"))
+        await load.delete()
     elif msg.text=="Добавить дисциплину":
         await msg.answer("Введите название дисциплины:",reply_markup=ReplyKeyboardRemove())
         await state.set_state(Table.set_data)
     elif msg.text=="Просмотреть дисциплины":
+        load=await msg.answer("Загрузка ...",reply_markup=ReplyKeyboardRemove())
         await msg.answer("Список дисциплин:",reply_markup=await kb_return_discipline("info discipline"))
+        await load.delete()
     elif msg.text=="Изменить дисциплину":
+        load=await msg.answer("Загрузка ...",reply_markup=ReplyKeyboardRemove())
         await msg.answer("Список дисциплин:",reply_markup=await kb_return_discipline("update discipline"))
+        await load.delete()
     elif msg.text=="Удалить дисциплину":
+        load=await msg.answer("Загрузка ...",reply_markup=ReplyKeyboardRemove())
         await msg.answer("Нажмите дисциплину для удаления:",reply_markup=InlineKeyboardMarkup(inline_keyboard=await kb_return_discipline("discipline del")))
+        await load.delete()
     else:
         await msg.answer("Неверная команда!")
         await state.set_state(Table.choice_operation)
@@ -206,18 +219,18 @@ async def callback_del_group(call:types.CallbackQuery, state:FSMContext):
         operation=await state.get_data()
         if operation["choice_operation"]=="Удалить группу":
             await db.delete_col("group", operation['group_id'])
-            await call.message.edit_text("Группа удалена!",reply_markup=ReplyKeyboardRemove())
+            await call.message.edit_text("Группа удалена!",reply_markup=None)
         elif operation["choice_operation"]=="Удалить дисциплину":
             await db.delete_col("discipline", operation['discipline_id'])
-            await call.message.edit_text("Дисциплина удалена!",reply_markup=ReplyKeyboardRemove())
+            await call.message.edit_text("Дисциплина удалена!",reply_markup=None)
         elif operation["choice_operation"]=="Удалить работу":
             await db.delete_col("works", operation['work_id'])
-            await call.message.edit_text("Работа удалена!",reply_markup=ReplyKeyboardRemove())
+            await call.message.edit_text("Работа удалена!",reply_markup=None)
         elif operation["choice_operation"]=="Удалить работу студента":
             await db.delete_col("works_student", operation['works_student_id'])
-            await call.message.edit_text("Работа студента удалена!",reply_markup=ReplyKeyboardRemove())
+            await call.message.edit_text("Работа студента удалена!",reply_markup=None)
     else:
-        await call.message.edit_text("Группа не удалена!",reply_markup=ReplyKeyboardRemove())
+        await call.message.edit_text("Группа не удалена!",reply_markup=None)
     await state.clear()
 @router.callback_query(F.data.regexp(r'discipline group \d+'))
 async def callback_discipline(call:types.CallbackQuery,state:FSMContext):
@@ -228,7 +241,7 @@ async def callback_discipline(call:types.CallbackQuery,state:FSMContext):
     await call.message.edit_text(f"""
     Дисциплина:{data["set_data"]}
     Группа:{group.name}
-    """,reply_markup=ReplyKeyboardRemove())
+    """,reply_markup=None)
     await db.add("discipline", [(data['set_data'], group_id)])
     await call.message.answer("Дисциплина добавлена!\nЖелаете добавит еще?", reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="Добавить еще дисциплину"), KeyboardButton(text="Назад")]], resize_keyboard=True))
     await state.set_state(Table.repite)
@@ -246,12 +259,12 @@ async def callback_work(call:types.CallbackQuery,state:FSMContext):
     await state.update_data(discipline_id=discipline_id)
     data=await state.get_data()
     if data["choice_operation"]=="Просмотреть работы":
-        await call.message.text_edit("Список работ:",
+        await call.message.edit_text("Список работ:",
                          reply_markup=await kb_return_works(discipline_id,"student get work")
                         )
         await state.set_state(Table.get_work)
     elif data["choice_operation"]=="Добавить работу":
-        await call.message.edit_text("Введите название работы:",reply_markup= ReplyKeyboardRemove())
+        await call.message.edit_text("Введите название работы:",reply_markup= None)
         await state.set_state(Table.set_data)
     elif data["choice_operation"]=="Изменить работу":
         await call.message.edit_text("Выберите работу для изменения:", reply_markup= await kb_return_works(discipline_id, "work update"))
@@ -311,7 +324,7 @@ async def callback_update_work(call:types.CallbackQuery, state:FSMContext):
 async def update_disc(call:types.CallbackQuery, state:FSMContext):
     discipline_id=int(call.data.split()[-1])
     await state.update_data(discipline_id=discipline_id)
-    await call.message.edit_text("Введите обновленное название дисциплины:", reply_markup=ReplyKeyboardRemove())
+    await call.message.edit_text("Введите обновленное название дисциплины:", reply_markup=None)
     await state.set_state(Table.set_data)
 
 """-------------------Проверка работ студентов------------------"""
