@@ -314,11 +314,12 @@ async def callback_del_work(call:types.CallbackQuery, state:FSMContext):
 async def callback_update_work(call:types.CallbackQuery, state:FSMContext):
     work_id=int(call.data.split()[-1])
     await state.update_data(work_id=work_id)
-    await call.message.edit_text("Выберите что хотите изменить",reply_markup=ReplyKeyboardMarkup(
+    await call.message.edit_text("Выберите что хотите изменить",reply_markup=None)
+    msg=await call.message.answer("Загрузка кнопок ...",reply_markup=ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text="Название"),KeyboardButton(text="Файл")],
                    [KeyboardButton(text="Отмена")]],
-        resize_keyboard=True
-    ))
+        resize_keyboard=True))
+    await msg.delete()
     await state.set_state(Table.set_data)
 @router.callback_query(F.data.regexp(r"update discipline \d+"))
 async def update_disc(call:types.CallbackQuery, state:FSMContext):
