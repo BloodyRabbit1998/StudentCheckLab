@@ -316,6 +316,8 @@ async def callback_update_work(call:types.CallbackQuery, state:FSMContext):
     await state.update_data(work_id=work_id)
     await call.message.edit_text("Выберите что хотите изменить",reply_markup=None)
     msg=await call.message.answer("Загрузка кнопок ...",reply_markup=ReplyKeyboardMarkup(
+    await call.message.delete()
+    await call.message.answer("Выберите что хотите изменить",reply_markup=ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text="Название"),KeyboardButton(text="Файл")],
                    [KeyboardButton(text="Отмена")]],
         resize_keyboard=True))
