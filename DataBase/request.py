@@ -356,7 +356,7 @@ async def return_all(table:str)->list:
     async with SESSION() as db:
         return [row for row in await db.scalars(stmt)]
 
-async def return_student_work_none(discipline_id:int,id_student:int=None)->list:
+async def return_student_work_none(id_discipline:int,id_student:int=None)->list:
     """
     Возвращает не принятые работы студентов по дисциплине.
 
@@ -387,7 +387,7 @@ async def return_student_work_none(discipline_id:int,id_student:int=None)->list:
             WorksStudent.id_student.label("id_student"),
             Works.name.label("name_work"), 
                 ).join(Works, WorksStudent.id_work == Works.id
-                ).where(WorksStudent.id_student == id_student and WorksStudent.accept == None and Works.id_discipline == discipline_id,
+                ).where(WorksStudent.id_student == id_student and WorksStudent.accept == None and Works.id_discipline == id_discipline,
                 ).order_by(Works.name)
     else:
         stmt = select(
@@ -398,7 +398,7 @@ async def return_student_work_none(discipline_id:int,id_student:int=None)->list:
                 ).join(WorksStudent, Student.telegram_id==WorksStudent.id_student
                 ).join(Works, WorksStudent.id_work == Works.id
                 ).join(Group, Student.id_group==Group.id
-                ).where(WorksStudent.accept == None,Works.id_discipline == discipline_id
+                ).where(WorksStudent.accept == None,Works.id_discipline == id_discipline
                 ).group_by( 
                     Student.telegram_id,
                     Student.name,
@@ -454,8 +454,7 @@ async def return_work_student(id_work:int)-> dict:
                 ).where(WorksStudent.id == id_work
                 )
     async with SESSION() as db:
-        rows=await db.execute(stmt)
-    rows=rows[-1]
+        row=await db.execute(stmt)
     return {
         'id_work':rows.id_work,
         'id_student':rows.id_student,

@@ -27,8 +27,8 @@ from pathlib import Path
 from .keyboard import *
 import logging
 import os
-from openpyxl import Workbook
-from openpyxl.styles import Font
+#from openpyxl import Workbook
+#from openpyxl.styles import Font
 router=Router()
 edit_table=False
 
@@ -351,18 +351,21 @@ async def view_works(msg:Message, state:FSMContext):
 @router.callback_query(CheckWork.choice_discipline,F.data.regexp(r"discipline check work \d+"))
 async def callback_work(call:types.CallbackQuery, state:FSMContext, bot:B):
     discipline_id=int(call.data.split()[-1])
-    kb,data=await kb_retutn_students_work( discipline_id,"student check work")
-    await call.message
-    await state.update_data(discipline_id=discipline_id,student=data)
+    kb=await kb_retutn_students_work( discipline_id,"student check work")
+    
+    await state.update_data(discipline_id=discipline_id)
     await call.message.edit_text("Работы по дисциплине", reply_markup=kb )
     await state.set_state(CheckWork.choice_student)
 @router.callback_query(CheckWork.choice_student, F.data.regexp(r"student check work \d+"))
 async def callback_work(call:types.CallbackQuery, state:FSMContext,bot:Bot):
     id_student=int(call.data.split()[-1])
     data=await state.get_data()
-    id_disciplite=data["discipline_id"]
-    await call.message.answer(f"Работы студента {data[id_student]['name']}({data[id_student]['group']}):")
-    for row in await db.return_student_work_none(id_disciplite=id_disciplite, id_student=id_student):
+    id_discipline=data["discipline_id"]
+    student = await db.return_student(id_student)
+    student=student[-1]
+    await call.message.delete()
+    await call.message.answer(f"Работы студента {student.name}:")
+    for row in await db.return_student_work_none(id_discipline=id_discipline, id_student=id_student):
         file_input = FSInputFile(row["path"])
         await bot.send_document(call.message.chat.id,file_input ,
                 caption=f"{row['name_work']}",
@@ -371,17 +374,17 @@ async def callback_work(call:types.CallbackQuery, state:FSMContext,bot:Bot):
         InlineKeyboardButton(text="❌ Не принять", callback_data=f"reject {row['id']}")]
     ]))
     logging.debug("Отправлены работы!")
-@router.callback_query(F.data.regexp(r"accept \d+ "))
+@router.callback_query(F.data.regexp(r"accept \d+"))
 async def callback_accept(call:types.CallbackQuery, state:FSMContext,bot:Bot):
     id_work=int(call.data.split()[-1])
     data=await state.get_data()
     await db.accept_work(id_work,True)
     await call.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-       [InlineKeyboardButton(text="✅ Принято", callback_data=f"")]]))
+       [InlineKeyboardButton(text="✅ Принято", callback_data="None")]]))
     work=await db.return_work_student(id_work=id_work)
     await bot.send_message(chat_id=work['id_student'], text=f"Дисциплина: {data['discipline_name']}\nРабота: {work_name}\nСтатус: ✅ Принята")
     await call.answer()
-@router.callback_query(F.data.regexp(r"reject \d+ \d+"))
+@router.callback_query(F.data.regexp(r"reject \d+"))
 async def callback_reject(call:types.CallbackQuery, state:FSMContext, bot:Bot):
     id_work,id_student=map(int, call.data.split()[1:])
     await state.update_data(id_work=id_work,id_student=id_student)
@@ -432,7 +435,7 @@ def _status_text(accept) -> str:
         return "❌ Не принята"
     return "🕖 На рассмотрении"
 
-
+'''
 async def generate_excel_report(discipline_id: int, group_id: int | None, data: list) -> str:
     """
     Генерирует Excel-файл отчёта по сданным работам в виде матрицы:
@@ -571,3 +574,4 @@ async def callback_report_group(call: types.CallbackQuery, state: FSMContext, bo
 
     await state.clear()
     await call.answer()
+'''
