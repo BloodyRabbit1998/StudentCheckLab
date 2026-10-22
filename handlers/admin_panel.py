@@ -1,3 +1,14 @@
+"""
+Router для админ панели
+Основные функции:
+- Просмотр и редактирование таблиц:
+    - Добавление, удаление и изменение дисциплин
+    - Добавление, удаление и изменение групп
+    - Добавление, удаление и изменение работ
+- Просмотр и проверка работ студентов
+
+"""
+
 from aiogram.types import ( InlineKeyboardButton, 
                             InlineKeyboardMarkup, 
                             KeyboardButton, 
@@ -15,6 +26,9 @@ from states import *
 from pathlib import Path
 from .keyboard import *
 import logging
+import os
+from openpyxl import Workbook
+from openpyxl.styles import Font
 router=Router()
 edit_table=False
 
@@ -335,9 +349,10 @@ async def view_works(msg:Message, state:FSMContext):
     await state.update_data(choice_operation="Просмотреть работы")
     await state.set_state(CheckWork.choice_discipline)
 @router.callback_query(CheckWork.choice_discipline,F.data.regexp(r"discipline check work \d+"))
-async def callback_work(call:types.CallbackQuery, state:FSMContext):
+async def callback_work(call:types.CallbackQuery, state:FSMContext, bot:B):
     discipline_id=int(call.data.split()[-1])
     kb,data=await kb_retutn_students_work( discipline_id,"student check work")
+    await call.message
     await state.update_data(discipline_id=discipline_id,student=data)
     await call.message.edit_text("Работы по дисциплине", reply_markup=kb )
     await state.set_state(CheckWork.choice_student)
@@ -346,49 +361,57 @@ async def callback_work(call:types.CallbackQuery, state:FSMContext,bot:Bot):
     id_student=int(call.data.split()[-1])
     data=await state.get_data()
     id_disciplite=data["discipline_id"]
-    data=data["student"]
     await call.message.answer(f"Работы студента {data[id_student]['name']}({data[id_student]['group']}):")
-    for work in data[id_student]["works"]:
-        row=await db.return_student_work_none(id_disciplite,work)
-        row=row[-1]
+    for row in await db.return_student_work_none(id_disciplite=id_disciplite, id_student=id_student):
         file_input = FSInputFile(row["path"])
         await bot.send_document(call.message.chat.id,file_input ,
                 caption=f"{row['name_work']}",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ Принять", callback_data=f"accept {row['id']} {row['id_student']}"),
-        InlineKeyboardButton(text="❌ Не принять", callback_data=f"reject {row['id']} {row['id_student']}")]
+        [InlineKeyboardButton(text="✅ Принять", callback_data=f"accept {row['id']}"),
+        InlineKeyboardButton(text="❌ Не принять", callback_data=f"reject {row['id']}")]
     ]))
     logging.debug("Отправлены работы!")
-@router.callback_query(F.data.regexp(r"accept \d+ \d+"))
+@router.callback_query(F.data.regexp(r"accept \d+ "))
 async def callback_accept(call:types.CallbackQuery, state:FSMContext,bot:Bot):
-    id_work,id_student=map(int,call.data.split()[1:])
+    id_work=int(call.data.split()[-1])
+    data=await state.get_data()
     await db.accept_work(id_work,True)
-    #await call.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-    #    [InlineKeyboardButton(text="✅ Принято", callback_data=f"")]]))
-    data=await db.return_work_accept(id_work)
-    work_name,discipline_name,path=data
-    await bot.send_message(chat_id=id_student, text=f"Дисциплина: {discipline_name}\nРабота: {work_name}\nСтатус: ✅ Принята")
+    await call.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+       [InlineKeyboardButton(text="✅ Принято", callback_data=f"")]]))
+    work=await db.return_work_student(id_work=id_work)
+    await bot.send_message(chat_id=work['id_student'], text=f"Дисциплина: {data['discipline_name']}\nРабота: {work_name}\nСтатус: ✅ Принята")
     await call.answer()
 @router.callback_query(F.data.regexp(r"reject \d+ \d+"))
 async def callback_reject(call:types.CallbackQuery, state:FSMContext, bot:Bot):
     id_work,id_student=map(int, call.data.split()[1:])
     await state.update_data(id_work=id_work,id_student=id_student)
     await db.accept_work(id_work, False)
-    await call.message.answer("Введите комменторий к работе:")
+    msg_request = await call.message.answer("Введите комменторий к работе:")
+    await state.update_data(request_comment_msg_id=msg_request.message_id)
     await state.set_state(CheckWork.check_work)
 @router.message(AdminFilter(),CheckWork.check_work)
 async def msg_reject(msg:Message, state:FSMContext, bot:Bot):
-    data=await state.get_data()
-    id_work,id_student=data["id_work"],data["id_student"]    
-    data=await db.return_work_accept(id_work)
-    work_name,discipline_name,path=data
+    state_data=await state.get_data()
+    id_work,id_student=state_data["id_work"],state_data["id_student"]
+    request_msg_id = state_data.get("request_comment_msg_id")
+
+    work_data=await db.return_work_accept(id_work)
+    work_name,discipline_name,path=work_data
     await bot.send_document(chat_id=id_student, document=FSInputFile(path), 
         caption=f"""
 Дисциплина: {discipline_name}
 Работа: {work_name}
 Статус: ❌ Не принята
 Комментарий {msg.text}""")
-    msg.answer()
+
+    # Удаляем сообщение администратора "Введите комментарий к работе:" после отправки нового
+    if request_msg_id:
+        try:
+            await bot.delete_message(chat_id=msg.chat.id, message_id=request_msg_id)
+        except Exception as e:
+            logging.warning(f"Не удалось удалить сообщение: {e}")
+
+    await state.clear()
 
 @router.message(AdminFilter(),F.text=="Отчет 📠")
 async def report(msg:Message, state:FSMContext):
@@ -400,3 +423,151 @@ async def callback_discipline(call:types.CallbackQuery, state:FSMContext):
     await state.update_data(discipline_id=discipline_id)
     await call.message.answer("Выберите группу:", reply_markup=await kb_return_group("group report"))
     await state.set_state(Report.choice_group)
+
+
+def _status_text(accept) -> str:
+    if accept is True:
+        return "✅ Принята"
+    if accept is False:
+        return "❌ Не принята"
+    return "🕖 На рассмотрении"
+
+
+async def generate_excel_report(discipline_id: int, group_id: int | None, data: list) -> str:
+    """
+    Генерирует Excel-файл отчёта по сданным работам в виде матрицы:
+        {Группа} {Дисциплина}
+        № | ФИО | группа | 1 | 2 | 3 | ...
+    где 1 — работа принята, 0 — не принята / на рассмотрении.
+
+    Returns:
+        str: Путь к созданному файлу.
+    """
+    if not data:
+        return None
+
+    # Уникальные названия работ по дисциплине, отсортированные
+    work_names = sorted({row.work_name for row in data})
+
+    # Уникальные студенты: ключ (имя, группа), значение — словарь {work_name: accept}
+    students_map = {}
+    for row in data:
+        key = (row.student_name, row.group_name)
+        if key not in students_map:
+            students_map[key] = {}
+        students_map[key][row.work_name] = row.accept
+
+    # Название группы и дисциплины (берем из первой строки)
+    group_name = data[0].group_name
+    discipline_name = data[0].discipline_name
+
+    wb = Workbook()
+    ws = wb.active
+    # Имя листа в Excel ограничено 31 символом
+    sheet_title = f"{group_name} {discipline_name}"[:31]
+    ws.title = sheet_title
+
+    # Заголовок группы и дисциплины
+    title_row = 1
+    ws.cell(row=title_row, column=1, value=f"{group_name} {discipline_name}")
+    ws.merge_cells(
+        start_row=title_row, start_column=1,
+        end_row=title_row, end_column=3 + len(work_names)
+    )
+    title_cell = ws.cell(row=title_row, column=1)
+    title_cell.font = Font(bold=True, size=14)
+
+    # Пустая строка
+    ws.append([])
+
+    # Заголовок таблицы
+    header_row = title_row + 2
+    headers = ["№", "ФИО", "группа"] + [str(i + 1) for i in range(len(work_names))]
+    for col_idx, value in enumerate(headers, start=1):
+        cell = ws.cell(row=header_row, column=col_idx, value=value)
+        cell.font = Font(bold=True)
+
+    # Данные по студентам
+    for row_idx, ((student_name, student_group), works_dict) in enumerate(
+        students_map.items(), start=header_row + 1
+    ):
+        ws.cell(row=row_idx, column=1, value=row_idx - header_row)          # №
+        ws.cell(row=row_idx, column=2, value=student_name)                   # ФИО
+        ws.cell(row=row_idx, column=3, value=student_group)                  # группа
+        for col_idx, work_name in enumerate(work_names, start=4):
+            accept = works_dict.get(work_name)
+            ws.cell(row=row_idx, column=col_idx, value=1 if accept is True else 0)
+
+    # Автоширина столбцов
+    for column in ws.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            try:
+                if cell.value is not None and len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except Exception:
+                pass
+        adjusted_width = min(max(max_length + 2, 8), 40)
+        ws.column_dimensions[column_letter].width = adjusted_width
+
+    # Сохраняем файл
+    reports_dir = Path(__file__).parent.parent / "files" / "reports"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    safe_group = str(group_id) if group_id else "all"
+    filename = f"report_discipline_{discipline_id}_group_{safe_group}.xlsx"
+    filepath = reports_dir / filename
+    wb.save(filepath)
+    return str(filepath)
+
+
+@router.callback_query(F.data.regexp(r"group report \d+"))
+async def callback_report_group(call: types.CallbackQuery, state: FSMContext, bot: Bot):
+    group_id = int(call.data.split()[-1])
+    state_data = await state.get_data()
+    discipline_id = state_data.get("discipline_id")
+
+    if not discipline_id:
+        await call.answer("Ошибка: дисциплина не выбрана")
+        return
+
+    # Получаем данные из БД
+    works_data = await db.return_submitted_works(discipline_id, group_id)
+
+    if not works_data:
+        await call.message.answer("Нет сданных работ по выбранным критериям.")
+        await state.clear()
+        await call.answer()
+        return
+
+    # Генерируем Excel
+    try:
+        filepath = await generate_excel_report(discipline_id, group_id, works_data)
+    except Exception as e:
+        logging.error(f"Ошибка генерации Excel: {e}")
+        await call.message.answer("Ошибка при генерации отчёта.")
+        await state.clear()
+        await call.answer()
+        return
+
+    if not filepath:
+        await call.message.answer("Нет данных для формирования отчёта.")
+        await state.clear()
+        await call.answer()
+        return
+
+    # Отправляем файл админу
+    await bot.send_document(
+        chat_id=call.message.chat.id,
+        document=FSInputFile(filepath),
+        caption=f"Отчёт по сданным работам (дисциплина ID: {discipline_id}, группа ID: {group_id})"
+    )
+
+    # Удаляем временный файл
+    try:
+        os.remove(filepath)
+    except Exception as e:
+        logging.warning(f"Не удалось удалить временный файл отчёта: {e}")
+
+    await state.clear()
+    await call.answer()

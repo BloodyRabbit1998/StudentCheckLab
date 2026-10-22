@@ -77,10 +77,12 @@ async def kb_return_student_works(id_student,id_discipline,call_text:str):
 async def kb_retutn_students_work(id_discipline:int,call_text:str):
     data=await db.return_student_work_none(id_discipline)
     kb=InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=f'{shorten_name(data[id_student]["name"])}({data[id_student]["group"]})-{data[id_student]["count_work"]}', callback_data=f"{call_text} {id_student}")] for id_student in data])
-    return kb,data
+        [InlineKeyboardButton(
+            text=f'{__shorten_name(student["name"])}({student["group"]})-{student["count"]}', 
+            callback_data=f"{call_text} {student['id_student']}")] for student in data])
+    return kb
 
-def shorten_name(full_name):
+def __shorten_name(full_name):
     parts = full_name.split()
     if len(parts) < 2:
         return full_name
