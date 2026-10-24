@@ -109,6 +109,7 @@ async def callback_discipline(call:types.CallbackQuery, state:FSMContext):
 async def callback_document(call:types.CallbackQuery, state:FSMContext,bot:Bot):
     work_id=int(call.data.split()[-1])
     work=await db.return_work(work_id)
+    work=work[-1]
     if work.path:
         file_input = FSInputFile(work.path)
         await bot.send_document(

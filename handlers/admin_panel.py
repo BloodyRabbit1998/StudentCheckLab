@@ -349,7 +349,7 @@ async def view_works(msg:Message, state:FSMContext):
     await state.update_data(choice_operation="Просмотреть работы")
     await state.set_state(CheckWork.choice_discipline)
 @router.callback_query(CheckWork.choice_discipline,F.data.regexp(r"discipline check work \d+"))
-async def callback_work(call:types.CallbackQuery, state:FSMContext, bot:B):
+async def callback_work(call:types.CallbackQuery, state:FSMContext, bot:Bot):
     discipline_id=int(call.data.split()[-1])
     kb=await kb_retutn_students_work( discipline_id,"student check work")
     
