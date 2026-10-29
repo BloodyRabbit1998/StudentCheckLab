@@ -17,6 +17,8 @@ from pathlib import Path
 from datetime import datetime
 
 router=Router()
+
+"""-------------------Регистрация студентов------------------"""
 @router.message(CommandStart())
 @router.message(Command('start'),F.text.in_(["start","Start","Старт"]))
 async def start(msg:Message,state:FSMContext):
@@ -25,6 +27,8 @@ async def start(msg:Message,state:FSMContext):
         await msg.answer("Вы не зарегестрированы! Необходимо пройти регистрацию.")
         await msg.answer("Введите вашу фамилию и имя полностью:",reply_markup=ReplyKeyboardRemove())
         await state.set_state(Student.choice_Name)
+
+
 @router.message(Student.choice_Name)
 async def set_name(msg:Message, state:FSMContext):
     if msg.text=="" or msg.text==None or "/" in msg.text:
@@ -34,9 +38,13 @@ async def set_name(msg:Message, state:FSMContext):
     await state.update_data(name=msg.text)
     await msg.answer("Выберите вашу группу:", reply_markup=await kb_return_group("student sel group"))
     await state.set_state(Student.choice_Group)
+
+
 @router.message(Command('menu'))
 async def menu(msg:Message):
     await msg.answer("Панель управления", reply_markup=kb_student_main)
+
+
 @router.callback_query(F.data.regexp(r"student sel group \d+"),Student.choice_Group)
 async def callback_group(call:types.CallbackQuery, state:FSMContext):
     group_id=int(call.data.split()[-1])
@@ -50,37 +58,57 @@ async def callback_group(call:types.CallbackQuery, state:FSMContext):
         await call.message.edit_text("Вы успешно зарегестрированы!",reply_markup=None)
     await state.clear()
     await menu(call.message)
+
+
 @router.message(Command("registration"))
 async def registration(msg:Message,state:FSMContext):
     await msg.answer("Введите вашу фамилию и имя полностью:", reply_markup=ReplyKeyboardRemove())
     await state.set_state(Student.choice_Name)
+
+"""-------------------Сдача работ студента------------------"""
 @router.message(F.text=="Сдать работу🧾")
 async def send_work(msg:Message, state:FSMContext):
     await state.clear()
     await msg.answer("Выберите дисциплину:",reply_markup=await kb_return_disciplin_id("discipline sel student",msg.from_user.id))
     await state.set_state(AddWork.choice_discipline)
+
+
 @router.callback_query(F.data.regexp(r"discipline sel student \d+"),AddWork.choice_discipline)
 async def callback_discipline(call:types.CallbackQuery, state:FSMContext):
     discipline_id=int(call.data.split()[-1])
     await state.update_data(discipline_id=discipline_id)
     await call.message.edit_text("Выберите работу:", reply_markup=await kb_return_works(discipline_id,"student sel work"))
     await state.set_state(AddWork.choice_work)
+
+
 @router.callback_query(F.data.regexp(r"student sel work \d+"),AddWork.choice_work)
 async def callback_discipline(call:types.CallbackQuery, state:FSMContext):
     work_id=int(call.data.split()[-1])
     await state.update_data(work_id=work_id)
-    await call.message.answer("Отправьте файл:", reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="Отменить отправку❌")]],resize_keyboard=True))
+    await state.update_data(last_msg=call.message)
+    await call.message.delete()
+    await call.message.answer("""
+Отправьте файл:
+(❗️❗️❗️ После отправки, обязательно дождитесь сообщения "**Работа отправлена!**" ❗️❗️❗️)
+""", reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="Отменить отправку❌")]],resize_keyboard=True))
     await state.set_state(AddWork.document)
+
+
 @router.message(AddWork.document, F.text.in_(["Отменить отправку❌"]))
 async def cancel_send(msg:Message, state:FSMContext):
+    message=state.get_value('last_msg')
+    await message.delete()
     await msg.answer("Отменено!", reply_markup=kb_student_main)
     await state.clear()
+
+
 @router.message(AddWork.document, F.document)
 async def add_document(msg:Message,state:FSMContext,bot:Bot):
     data=await state.get_data()
     student=await db.return_student(msg.from_user.id)
     group=await db.return_group(student[-1].id_group)
     work=await db.return_work(data['work_id'])
+    work=work[-1]
     disc=await db.return_discipline(data['discipline_id'])
     path= Path(__file__).parent.parent /"files"/"documents"/"works students"/f"{group.name}"/disc[-1].name/student[-1].name
     path=path.resolve()
@@ -92,11 +120,14 @@ async def add_document(msg:Message,state:FSMContext,bot:Bot):
     await msg.answer("Работа отправлена!")
     await menu(msg)
     await state.clear()
+
+"""-------------------Пролучение работы студенту------------------"""    
 @router.message(F.text=="Получить работу👁‍🗨")
 async def get_work(msg:Message, state:FSMContext):
     await state.clear()
     await msg.answer("Выберите дисциплину:", reply_markup=await kb_return_disciplin_id("discipline sel get work",msg.from_user.id))
     await state.set_state(AddWork.choice_discipline)
+
 
 @router.callback_query(F.data.regexp(r"discipline sel get work \d+"),AddWork.choice_discipline)
 async def callback_discipline(call:types.CallbackQuery, state:FSMContext):
@@ -104,9 +135,12 @@ async def callback_discipline(call:types.CallbackQuery, state:FSMContext):
     await state.update_data(discipline_id=discipline_id)
     await call.message.edit_text("Выберите работу:", reply_markup=await kb_return_works(discipline_id, "student get work"))
     await state.set_state(AddWork.choice_work)
+
+
 @router.callback_query(F.data.regexp(r"student get work \d+"),Table.get_work)
 @router.callback_query(F.data.regexp(r"student get work \d+"), AddWork.choice_work)
 async def callback_document(call:types.CallbackQuery, state:FSMContext,bot:Bot):
+    
     work_id=int(call.data.split()[-1])
     work=await db.return_work(work_id)
     work=work[-1]
@@ -117,13 +151,18 @@ async def callback_document(call:types.CallbackQuery, state:FSMContext,bot:Bot):
             caption=f'{work.name}')
     else:
         await call.message.edit_text("Ошибка загрузки!",reply_markup=None)
+    await call.message.delete()
     await state.clear()
     await state.set_state(Table.choice_operation)
+
+"""-------------------Список работ студента------------------"""
 @router.message(F.text=="Список моих работ")
 async def get_work(msg:Message, state:FSMContext):
     await state.clear()
     await msg.answer("Выберите дисциплину:", reply_markup=await kb_return_disciplin_id("discipline sel student for works", msg.from_user.id))
     await state.set_state(AddWork.choice_discipline)
+
+
 @router.callback_query(F.data.regexp(r"discipline sel student for works \d+"), AddWork.choice_discipline)
 async def callback_discipline(call:types.CallbackQuery, state:FSMContext):
     discipline_id=int(call.data.split()[-1])
@@ -133,7 +172,7 @@ async def callback_discipline(call:types.CallbackQuery, state:FSMContext):
     await state.clear()
     await menu(call.message)
 
-
+"""-------------------Доп функции для студентов------------------"""
 @router.message(F.text=="Получить шаблон📝")
 async def get_template(msg:Message, state:FSMContext):
     await state.clear()
@@ -141,6 +180,8 @@ async def get_template(msg:Message, state:FSMContext):
         inline_keyboard=[
             [InlineKeyboardButton(text="Шаблон отчета", callback_data="template 1")],
     ]))
+
+
 @router.callback_query(F.data.regexp(r"template \d+"))
 async def get_work(call:types.CallbackQuery,bot:Bot):
     try:
