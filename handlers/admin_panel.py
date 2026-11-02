@@ -78,7 +78,7 @@ async def edir_table_status(msg:Message,state:FSMContext):
         await msg.answer("Вы вышли из режима изменения базы данных")
         await state.clear()
         await menu(msg,state)
-@router.message(AdminFilter(),Table.choice_table)
+@router.message(AdminFilter(),Table.choice_table, ~F.text=="Архивация базы данных")
 async def table(msg:Message,state:FSMContext):
     await state.update_data(choice_table=msg.text)
     kbs={"Работы":kb_admin_works,
