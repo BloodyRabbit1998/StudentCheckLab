@@ -1,4 +1,4 @@
-#!/mnt/flash_disk/bots/StudentCheckLab/.venv/bin/python3.11
+#!/Users/bloodyrabbit/Projects/StudentCheckLab/.venv/bin/python3.11
 # -*- coding: utf-8 -*-
 import re
 import sys

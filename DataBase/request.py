@@ -505,6 +505,22 @@ async def return_submitted_works(id_discipline:int, group_id:int=None)->list:
     return rows.all()
 
 
+async def clean_for_next_year(date):
+    """
+    Очищает базу данных для следующего учебного года, удаляя студентов,
+    группы и дисциплины до указанной дате.
+
+    Args:
+        date: Дата (datetime.date)  для определения текущего учебного года.
+    """
+    
+    async with SESSION() as db:
+        # Удаляем студентов, группы и дисциплины до указанной даты
+        await db.execute(delete(WorksStudent).where(WorksStudent.date_of_delivery < date)
+        )
+        await db.commit()
+
+
 if __name__=="__main__":
     import asyncio
 

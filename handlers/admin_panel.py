@@ -27,6 +27,7 @@ from pathlib import Path
 from .keyboard import *
 import logging
 import os
+from config import UPDATE_DATE
 #from openpyxl import Workbook
 #from openpyxl.styles import Font
 router=Router()
@@ -66,7 +67,8 @@ async def edir_table_status(msg:Message,state:FSMContext):
         await msg.answer("Вы перешли в режим изменения базы данных",
                          reply_markup=ReplyKeyboardMarkup(keyboard=[   
             [KeyboardButton(text="Работы"),KeyboardButton(text="Группы")],
-            [KeyboardButton(text="Дисциплины"),KeyboardButton(text="Назад")]
+            [KeyboardButton(text="Дисциплины"),KeyboardButton(text="Назад")],
+            [KeyboardButton(text="Архивация базы данных")]
         ]),resize_keyboard=True)
         await state.set_state(Table.choice_table)
     else:
@@ -340,6 +342,19 @@ async def update_disc(call:types.CallbackQuery, state:FSMContext):
     await state.update_data(discipline_id=discipline_id)
     await call.message.edit_text("Введите обновленное название дисциплины:", reply_markup=None)
     await state.set_state(Table.set_data)
+
+
+@router.message(AdminFilter(),F.text=="Архивация базы данных")
+async def archive_database(msg:Message):    
+    import datetime
+    timestamp = datetime.datetime.now().strftime("%Y")
+    os.copy("DataBase/database.db", f"DataBase/archive/database_{timestamp}.db")
+    msg_info=await msg.answer(f"База данных успешно архивирована в DataBase/archive/database_{timestamp}.db")
+    await db.clean_for_next_year(datetime.datetime(year=timestamp.year, 
+                                                   month=UPDATE_DATE["month"], 
+                                                   day=UPDATE_DATE["day"]))
+    await msg_info.edit_text(f"База данных успешно архивирована в DataBase/archive/database_{timestamp}.db\nБаза данных очищена для следующего года.")
+    
 
 """-------------------Проверка работ студентов------------------"""
 

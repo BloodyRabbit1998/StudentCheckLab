@@ -21,7 +21,7 @@ msg_student_start="""
 kb_admin_main=ReplyKeyboardMarkup(keyboard=[
                                 [KeyboardButton(text="Редактирование таблиц 🧾"), KeyboardButton(text="Просмотреть работы 🔎")],
                                 [ KeyboardButton(text="Отчет 📠"), KeyboardButton(text="Сообщение группе🧾")],
-                                [ KeyboardButton(text="В разработке ... 🧾")]],
+                                ],
                                 resize_keyboard=True)                    
 kb_student_main=ReplyKeyboardMarkup(keyboard=[
                                 [KeyboardButton(text="Сдать работу🧾"), KeyboardButton(text="Список моих работ")],

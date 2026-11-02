@@ -8,6 +8,7 @@ URL_SQL=env["SQL_URL"]
 AI_TOKEN=env["AI_TOKEN"]
 BOT_TOKEN=env["BOT_TOKEN"]
 FONT_NAME=env["FONT_NAME"]
+UPDATE_DATE=eval(env["UPDATE_DATE"])
 
 admins=env["ADMINS_ID"]
 if "," in admins:
