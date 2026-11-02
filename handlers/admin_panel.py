@@ -386,7 +386,9 @@ async def callback_accept(call:types.CallbackQuery, state:FSMContext,bot:Bot):
     await call.answer()
 @router.callback_query(F.data.regexp(r"reject \d+"))
 async def callback_reject(call:types.CallbackQuery, state:FSMContext, bot:Bot):
-    id_work,id_student=map(int, call.data.split()[1:])
+    id_work=int(call.data.split()[-1])
+    work=await db.return_work_student(id_work=id_work)
+    id_student=work["id_student"]
     await state.update_data(id_work=id_work,id_student=id_student)
     await db.accept_work(id_work, False)
     msg_request = await call.message.answer("Введите комменторий к работе:")

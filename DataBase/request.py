@@ -456,7 +456,10 @@ async def return_work_student(id_work:int)-> dict:
                 ).where(WorksStudent.id == id_work
                 )
     async with SESSION() as db:
-        row=await db.execute(stmt)
+        result=await db.execute(stmt)
+    row=result.first()
+    if row is None:
+        return None
     return {
         'id_work':row.id_work,
         'id_student':row.id_student,
