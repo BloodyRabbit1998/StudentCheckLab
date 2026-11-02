@@ -27,7 +27,7 @@ from pathlib import Path
 from .keyboard import *
 import logging
 import os
-from config import UPDATE_DATE
+from config import UPDATE_DATE,URL_SQL
 #from openpyxl import Workbook
 #from openpyxl.styles import Font
 router=Router()
@@ -346,10 +346,11 @@ async def update_disc(call:types.CallbackQuery, state:FSMContext):
 
 @router.message(AdminFilter(),F.text=="Архивация базы данных")
 async def archive_database(msg:Message):    
-    import datetime
+    import datetime, aiofiles
     timestamp = datetime.datetime.now().strftime("%Y")
-    os.copy("DataBase/database.db", f"DataBase/archive/database_{timestamp}.db")
-    msg_info=await msg.answer(f"База данных успешно архивирована в DataBase/archive/database_{timestamp}.db")
+    database_path = "/".join(URL_SQL.split("/")[-2:])
+    await aiofiles.os.copy(database_path, f"{database_path.rsplit('/', 1)[0]}/db_archive/database_{timestamp}.db")
+    msg_info=await msg.answer(f"База данных успешно архивирована в DataBase/archive/database_{timestamp}.db\nОчищаем базу данных для следующего года...")
     await db.clean_for_next_year(datetime.datetime(year=timestamp.year, 
                                                    month=UPDATE_DATE["month"], 
                                                    day=UPDATE_DATE["day"]))
