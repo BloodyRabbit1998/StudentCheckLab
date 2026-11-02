@@ -382,7 +382,7 @@ async def callback_accept(call:types.CallbackQuery, state:FSMContext,bot:Bot):
     await call.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(inline_keyboard=[
        [InlineKeyboardButton(text="✅ Принято", callback_data="None")]]))
     work=await db.return_work_student(id_work=id_work)
-    await bot.send_message(chat_id=work['id_student'], text=f"Дисциплина: {data['discipline_name']}\nРабота: {work_name}\nСтатус: ✅ Принята")
+    await bot.send_message(chat_id=work['id_student'], text=f"Дисциплина: {data['discipline_name']}\nРабота: {work['work_name']}\nСтатус: ✅ Принята")
     await call.answer()
 @router.callback_query(F.data.regexp(r"reject \d+"))
 async def callback_reject(call:types.CallbackQuery, state:FSMContext, bot:Bot):

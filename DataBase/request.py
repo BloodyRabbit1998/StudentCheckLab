@@ -92,7 +92,7 @@ async def return_discipline(row:int|str,**kwargs)->list[Discipline]:
     logging.debug(rows)
     return [row for row in rows]
 
-async def return_work(id:int,**kwargs)->list[Works]:
+async def return_work(id:int,id_discipline=None,name=None)->list[Works]:
     '''
     Возвращает работу или список работ.
 
@@ -106,13 +106,11 @@ async def return_work(id:int,**kwargs)->list[Works]:
         list[Works]: Список объектов работ. При поиске по id возвращается
         список с одним последним найденным объектом (или пустой список).
     '''
-    if kwargs:
-        if "id_discipline" in kwargs:
-            stmt=select(Works).where(Works.id_discipline==kwargs["id_discipline"])
-        elif "name" in kwargs:
-            stmt=select(Works).where(Works.name==kwargs["name"])
-        else:
-            return []
+    
+    if id_discipline:
+        stmt=select(Works).where(Works.id_discipline==id_discipline)
+    elif name:
+        stmt=select(Works).where(Works.name==name)
     else:
         stmt=select(Works).where(Works.id==id)
             
@@ -120,7 +118,7 @@ async def return_work(id:int,**kwargs)->list[Works]:
         rows=await db.scalars(stmt)
     logging.debug(rows)
     result=[row for row in rows]
-    return result if kwargs else (result[-1:] if result else [])
+    return result
 
 async def check_work(id_student:int,id_work:int)->list[WorksStudent]:
     '''
@@ -361,7 +359,7 @@ async def return_student_work_none(id_discipline:int,id_student:int=None)->list:
     Возвращает не принятые работы студентов по дисциплине.
 
     Args:
-        discipline_id: Идентификатор дисциплины.
+        id_discipline: Идентификатор дисциплины.
         id_student: Telegram ID студента (опционально). Если указан, возвращаются
             только работы этого студента; иначе — все не принятые работы по дисциплине.
 
@@ -387,7 +385,9 @@ async def return_student_work_none(id_discipline:int,id_student:int=None)->list:
             WorksStudent.id_student.label("id_student"),
             Works.name.label("name_work"), 
                 ).join(Works, WorksStudent.id_work == Works.id
-                ).where(WorksStudent.id_student == id_student and WorksStudent.accept == None and Works.id_discipline == id_discipline,
+                ).where(WorksStudent.id_student == id_student,
+                        WorksStudent.accept == None,
+                        Works.id_discipline == id_discipline,
                 ).order_by(Works.name)
     else:
         stmt = select(
@@ -398,7 +398,9 @@ async def return_student_work_none(id_discipline:int,id_student:int=None)->list:
                 ).join(WorksStudent, Student.telegram_id==WorksStudent.id_student
                 ).join(Works, WorksStudent.id_work == Works.id
                 ).join(Group, Student.id_group==Group.id
-                ).where(WorksStudent.accept == None,Works.id_discipline == id_discipline
+                ).where(
+                    WorksStudent.accept == None,
+                    Works.id_discipline == id_discipline
                 ).group_by( 
                     Student.telegram_id,
                     Student.name,
@@ -431,12 +433,12 @@ async def return_student_work_none(id_discipline:int,id_student:int=None)->list:
 async def return_work_student(id_work:int)-> dict:
     '''
     return {
-            'id':rows.id,
-            'id_student':rows.id_student,
-            'id_work':rows.id_work,
-            'date_of_delivery':rows.date_of_delivery,
-            'path':rows.path,
-            'accept':rows.accept
+            'id_work':row.id_work,
+            'id_student':row.id_student,
+            'name_student':row.name_student,
+            'group_name':row.group_name,
+            'discipline_name':row.discipline_name,
+            'work_name':row.work_name
             }
     '''
     
@@ -456,20 +458,20 @@ async def return_work_student(id_work:int)-> dict:
     async with SESSION() as db:
         row=await db.execute(stmt)
     return {
-        'id_work':rows.id_work,
-        'id_student':rows.id_student,
-        'name_student':rows.name_student,
-        'group_name':rows.group_name,
-        'discipline_name':rows.discipline_name,
-        'work_name':rows.work_name
+        'id_work':row.id_work,
+        'id_student':row.id_student,
+        'name_student':row.name_student,
+        'group_name':row.group_name,
+        'discipline_name':row.discipline_name,
+        'work_name':row.work_name
         }
         
-async def return_submitted_works(discipline_id:int, group_id:int=None)->list:
+async def return_submitted_works(id_discipline:int, group_id:int=None)->list:
     """
     Возвращает все сданные работы по дисциплине (опционально по группе).
 
     Args:
-        discipline_id: Идентификатор дисциплины.
+        id_discipline: Идентификатор дисциплины.
         group_id: Идентификатор группы (опционально).
 
     Returns:
@@ -488,7 +490,7 @@ async def return_submitted_works(discipline_id:int, group_id:int=None)->list:
     ).join(Works, WorksStudent.id_work == Works.id
     ).join(Group, Student.id_group == Group.id
     ).join(Discipline, Works.id_discipline == Discipline.id
-    ).where(Works.id_discipline == discipline_id)
+    ).where(Works.id_discipline == id_discipline)
 
     if group_id:
         stmt = stmt.where(Student.id_group == group_id)
