@@ -27,7 +27,10 @@ from pathlib import Path
 from .keyboard import *
 import logging
 import os
-from config import UPDATE_DATE,URL_SQL
+import asyncio
+import datetime
+import shutil
+from config import UPDATE_DATE,URL_SQL,BASE_DIR
 #from openpyxl import Workbook
 #from openpyxl.styles import Font
 router=Router()
@@ -346,15 +349,29 @@ async def update_disc(call:types.CallbackQuery, state:FSMContext):
 
 @router.message(AdminFilter(),F.text=="Архивация базы данных")
 async def archive_database(msg:Message):    
-    import datetime, aiofiles
-    timestamp = datetime.datetime.now().strftime("%Y")
-    database_path = "/".join(URL_SQL.split("/")[-2:])
-    await aiofiles.os.copy(database_path, f"{database_path.rsplit('/', 1)[0]}/db_archive/database_{timestamp}.db")
-    msg_info=await msg.answer(f"База данных успешно архивирована в DataBase/archive/database_{timestamp}.db\nОчищаем базу данных для следующего года...")
-    await db.clean_for_next_year(datetime.datetime(year=timestamp.year, 
+    now = datetime.datetime.now()
+    timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
+
+    # SQL_URL вида sqlite+aiosqlite:///files/db.sqlite3 -> путь к файлу БД
+    db_rel_path = URL_SQL.split("///")[-1]
+    database_path = os.path.join(BASE_DIR, db_rel_path)
+    archive_dir = os.path.join(os.path.dirname(database_path), "db_archive")
+    archive_path = os.path.join(archive_dir, f"database_{timestamp}.db")
+
+    try:
+        os.makedirs(archive_dir, exist_ok=True)
+        await asyncio.to_thread(shutil.copy2, database_path, archive_path)
+    except Exception as e:
+        logging.exception("Не удалось архивировать базу данных")
+        await msg.answer(f"Не удалось архивировать базу данных: {e}")
+        return
+
+    display_path = os.path.relpath(archive_path, BASE_DIR)
+    msg_info=await msg.answer(f"База данных успешно архивирована в {display_path}\nОчищаем базу данных для следующего года...")
+    await db.clean_for_next_year(datetime.datetime(year=now.year, 
                                                    month=UPDATE_DATE["month"], 
                                                    day=UPDATE_DATE["day"]))
-    await msg_info.edit_text(f"База данных успешно архивирована в DataBase/archive/database_{timestamp}.db\nБаза данных очищена для следующего года.")
+    await msg_info.edit_text(f"База данных успешно архивирована в {display_path}\nБаза данных очищена для следующего года.")
     
 
 """-------------------Проверка работ студентов------------------"""
