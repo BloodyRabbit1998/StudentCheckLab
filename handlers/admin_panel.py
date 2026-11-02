@@ -31,8 +31,9 @@ import asyncio
 import datetime
 import shutil
 from config import UPDATE_DATE,URL_SQL,BASE_DIR
-#from openpyxl import Workbook
-#from openpyxl.styles import Font
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, PatternFill
+from openpyxl.utils import get_column_letter
 router=Router()
 edit_table=False
 
@@ -453,33 +454,50 @@ async def msg_reject(msg:Message, state:FSMContext, bot:Bot):
 
 @router.message(AdminFilter(),F.text=="Отчет 📠")
 async def report(msg:Message, state:FSMContext):
+    await state.clear()
     await msg.answer("Выберите дисциплину:", reply_markup=await kb_return_discipline("discipline report"))
     await state.set_state(Report.choice_discipline)
 @router.callback_query(F.data.regexp(r"discipline report \d+"))
-async def callback_discipline(call:types.CallbackQuery, state:FSMContext):
+async def callback_discipline(call:types.CallbackQuery, state:FSMContext, bot:Bot):
     discipline_id=int(call.data.split()[-1])
-    await state.update_data(discipline_id=discipline_id)
-    await call.message.answer("Выберите группу:", reply_markup=await kb_return_group("group report"))
-    await state.set_state(Report.choice_group)
+    disciplines=await db.return_discipline(discipline_id)
+    if not disciplines:
+        await call.answer("Дисциплина не найдена", show_alert=True)
+        return
+
+    discipline=disciplines[-1]
+    await state.update_data(discipline_id=discipline_id, group_id=discipline.id_group)
+    await call.answer("Формирую отчёт...")
+    try:
+        await call.message.edit_text(f"Формирую отчёт по дисциплине «{discipline.name}»...")
+    except Exception:
+        pass
+
+    # Дисциплина привязана к конкретной группе, поэтому отчёт формируем сразу
+    await _send_report(call, state, bot, discipline_id, discipline.id_group)
 
 
-def _status_text(accept) -> str:
-    if accept is True:
-        return "✅ Принята"
-    if accept is False:
-        return "❌ Не принята"
-    return "🕖 На рассмотрении"
+STATUS_MARK = {True: "✅", False: "❌", None: "🕖"}
 
-'''
-async def generate_excel_report(discipline_id: int, group_id: int | None, data: list) -> str:
+
+def _safe_sheet_title(title: str) -> str:
+    """Убирает символы, недопустимые в имени листа Excel, и ограничивает длину."""
+    for ch in ':\\/?*[]':
+        title = title.replace(ch, "-")
+    return (title.strip() or "Отчёт")[:31]
+
+
+async def generate_excel_report(discipline_id: int, group_id: int | None, data: list) -> str | None:
     """
-    Генерирует Excel-файл отчёта по сданным работам в виде матрицы:
-        {Группа} {Дисциплина}
-        № | ФИО | группа | 1 | 2 | 3 | ...
-    где 1 — работа принята, 0 — не принята / на рассмотрении.
+    Генерирует Excel-отчёт по сданным работам в виде матрицы:
+        {Группа} — {Дисциплина}
+        № | ФИО | группа | 1 | 2 | 3 | ... | Сдано | Принято
+
+    В ячейках: ✅ — принята, ❌ — не принята, 🕖 — на рассмотрении,
+    пусто — работа не сдана.
 
     Returns:
-        str: Путь к созданному файлу.
+        str | None: Путь к созданному файлу или None, если данных нет.
     """
     if not data:
         return None
@@ -487,13 +505,11 @@ async def generate_excel_report(discipline_id: int, group_id: int | None, data: 
     # Уникальные названия работ по дисциплине, отсортированные
     work_names = sorted({row.work_name for row in data})
 
-    # Уникальные студенты: ключ (имя, группа), значение — словарь {work_name: accept}
-    students_map = {}
+    # Уникальные студенты: ключ (группа, имя), значение — {work_name: accept}
+    students_map: dict[tuple[str, str], dict[str, bool | None]] = {}
     for row in data:
-        key = (row.student_name, row.group_name)
-        if key not in students_map:
-            students_map[key] = {}
-        students_map[key][row.work_name] = row.accept
+        key = (row.group_name, row.student_name)
+        students_map.setdefault(key, {})[row.work_name] = row.accept
 
     # Название группы и дисциплины (берем из первой строки)
     group_name = data[0].group_name
@@ -501,112 +517,139 @@ async def generate_excel_report(discipline_id: int, group_id: int | None, data: 
 
     wb = Workbook()
     ws = wb.active
-    # Имя листа в Excel ограничено 31 символом
-    sheet_title = f"{group_name} {discipline_name}"[:31]
-    ws.title = sheet_title
+    # Имя листа в Excel ограничено 31 символом и не должно содержать спецсимволов
+    ws.title = _safe_sheet_title(f"{group_name} {discipline_name}")
 
-    # Заголовок группы и дисциплины
+    first_work_col = 4
+    submitted_col = first_work_col + len(work_names)
+    accepted_col = submitted_col + 1
+    last_col = accepted_col
+
+    # Заголовок отчёта
     title_row = 1
-    ws.cell(row=title_row, column=1, value=f"{group_name} {discipline_name}")
-    ws.merge_cells(
-        start_row=title_row, start_column=1,
-        end_row=title_row, end_column=3 + len(work_names)
-    )
-    title_cell = ws.cell(row=title_row, column=1)
+    ws.merge_cells(start_row=title_row, start_column=1, end_row=title_row, end_column=last_col)
+    title_cell = ws.cell(row=title_row, column=1, value=f"{group_name} — {discipline_name}")
     title_cell.font = Font(bold=True, size=14)
-
-    # Пустая строка
-    ws.append([])
+    title_cell.alignment = Alignment(horizontal="center")
 
     # Заголовок таблицы
-    header_row = title_row + 2
-    headers = ["№", "ФИО", "группа"] + [str(i + 1) for i in range(len(work_names))]
+    header_row = 3
+    headers = ["№", "ФИО", "группа"]
+    headers += [str(i + 1) for i in range(len(work_names))]
+    headers += ["Сдано", "Принято"]
     for col_idx, value in enumerate(headers, start=1):
         cell = ws.cell(row=header_row, column=col_idx, value=value)
         cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    # Расшифровка номеров работ
+    names_row = header_row + 1
+    for col_idx, work_name in enumerate(work_names, start=first_work_col):
+        cell = ws.cell(row=names_row, column=col_idx, value=work_name)
+        cell.font = Font(italic=True, size=9)
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    # Обозначения статусов
+    legend_row = names_row + 1
+    ws.merge_cells(start_row=legend_row, start_column=1, end_row=legend_row, end_column=last_col)
+    legend_cell = ws.cell(
+        row=legend_row, column=1,
+        value="Обозначения: ✅ принята, ❌ не принята, 🕖 на рассмотрении, пусто — работа не сдана",
+    )
+    legend_cell.font = Font(italic=True, size=9)
+    legend_cell.alignment = Alignment(horizontal="left")
 
     # Данные по студентам
-    for row_idx, ((student_name, student_group), works_dict) in enumerate(
-        students_map.items(), start=header_row + 1
+    first_data_row = legend_row + 1
+    for row_idx, ((student_group, student_name), works_dict) in enumerate(
+        students_map.items(), start=first_data_row
     ):
-        ws.cell(row=row_idx, column=1, value=row_idx - header_row)          # №
+        ws.cell(row=row_idx, column=1, value=row_idx - first_data_row + 1)   # №
         ws.cell(row=row_idx, column=2, value=student_name)                   # ФИО
         ws.cell(row=row_idx, column=3, value=student_group)                  # группа
-        for col_idx, work_name in enumerate(work_names, start=4):
-            accept = works_dict.get(work_name)
-            ws.cell(row=row_idx, column=col_idx, value=1 if accept is True else 0)
+        for col_idx, work_name in enumerate(work_names, start=first_work_col):
+            if work_name in works_dict:
+                cell = ws.cell(row=row_idx, column=col_idx,
+                               value=STATUS_MARK[works_dict[work_name]])
+                cell.alignment = Alignment(horizontal="center")
+        ws.cell(row=row_idx, column=submitted_col, value=len(works_dict))
+        ws.cell(row=row_idx, column=accepted_col,
+                value=sum(1 for accept in works_dict.values() if accept is True))
 
     # Автоширина столбцов
-    for column in ws.columns:
+    for col_idx in range(1, last_col + 1):
         max_length = 0
-        column_letter = column[0].column_letter
-        for cell in column:
-            try:
-                if cell.value is not None and len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except Exception:
-                pass
+        for row in ws.iter_rows(min_col=col_idx, max_col=col_idx, values_only=True):
+            value = row[0]
+            if value is not None:
+                max_length = max(max_length, len(str(value)))
         adjusted_width = min(max(max_length + 2, 8), 40)
-        ws.column_dimensions[column_letter].width = adjusted_width
+        ws.column_dimensions[get_column_letter(col_idx)].width = adjusted_width
 
     # Сохраняем файл
     reports_dir = Path(__file__).parent.parent / "files" / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
     safe_group = str(group_id) if group_id else "all"
-    filename = f"report_discipline_{discipline_id}_group_{safe_group}.xlsx"
-    filepath = reports_dir / filename
-    wb.save(filepath)
+    filepath = reports_dir / f"report_discipline_{discipline_id}_group_{safe_group}.xlsx"
+    await asyncio.to_thread(wb.save, filepath)
     return str(filepath)
 
 
-@router.callback_query(F.data.regexp(r"group report \d+"))
-async def callback_report_group(call: types.CallbackQuery, state: FSMContext, bot: Bot):
-    group_id = int(call.data.split()[-1])
-    state_data = await state.get_data()
-    discipline_id = state_data.get("discipline_id")
-
-    if not discipline_id:
-        await call.answer("Ошибка: дисциплина не выбрана")
-        return
-
+async def _send_report(call: types.CallbackQuery, state: FSMContext, bot: Bot,
+                       discipline_id: int, group_id: int | None):
+    """Формирует Excel-отчёт и отправляет его админу в чат."""
     # Получаем данные из БД
     works_data = await db.return_submitted_works(discipline_id, group_id)
 
     if not works_data:
         await call.message.answer("Нет сданных работ по выбранным критериям.")
         await state.clear()
-        await call.answer()
         return
 
     # Генерируем Excel
     try:
         filepath = await generate_excel_report(discipline_id, group_id, works_data)
-    except Exception as e:
-        logging.error(f"Ошибка генерации Excel: {e}")
+    except Exception:
+        logging.exception("Ошибка генерации Excel")
         await call.message.answer("Ошибка при генерации отчёта.")
         await state.clear()
-        await call.answer()
         return
 
     if not filepath:
         await call.message.answer("Нет данных для формирования отчёта.")
         await state.clear()
-        await call.answer()
         return
 
-    # Отправляем файл админу
-    await bot.send_document(
-        chat_id=call.message.chat.id,
-        document=FSInputFile(filepath),
-        caption=f"Отчёт по сданным работам (дисциплина ID: {discipline_id}, группа ID: {group_id})"
-    )
+    group_name = works_data[0].group_name
+    discipline_name = works_data[0].discipline_name
 
-    # Удаляем временный файл
+    # Отправляем файл админу
     try:
-        os.remove(filepath)
-    except Exception as e:
-        logging.warning(f"Не удалось удалить временный файл отчёта: {e}")
+        await bot.send_document(
+            chat_id=call.message.chat.id,
+            document=FSInputFile(filepath),
+            caption=f"Отчёт: {discipline_name}, группа {group_name}",
+        )
+    finally:
+        # Удаляем временный файл в любом случае
+        try:
+            os.remove(filepath)
+        except Exception as e:
+            logging.warning(f"Не удалось удалить временный файл отчёта: {e}")
 
     await state.clear()
-    await call.answer()
-'''
+
+
+@router.callback_query(F.data.regexp(r"group report \d+"))
+async def callback_report_group(call: types.CallbackQuery, state: FSMContext, bot: Bot):
+    # Оставлено для совместимости со старыми сообщениями с выбором группы
+    group_id = int(call.data.split()[-1])
+    state_data = await state.get_data()
+    discipline_id = state_data.get("discipline_id")
+
+    if not discipline_id:
+        await call.answer("Ошибка: дисциплина не выбрана", show_alert=True)
+        return
+
+    await call.answer("Формирую отчёт...")
+    await _send_report(call, state, bot, discipline_id, group_id)
