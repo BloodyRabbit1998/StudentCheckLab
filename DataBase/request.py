@@ -504,6 +504,17 @@ async def return_submitted_works(id_discipline:int, group_id:int=None)->list:
         rows = await db.execute(stmt)
     return rows.all()
 
+async def retutn_works_student_all(id_student:int, id_discipline:int=None)->list:
+    stmt=select(
+        WorksStudent.id.label("id"),
+        Works.name.label("name_work"),
+        WorksStudent.accept.label("accept")
+        ).join(Works,WorksStudent.id_work==Works.id
+        ).where(WorksStudent.id_student==id_student,Works.id_discipline==id_discipline if id_discipline else True)
+    async with SESSION() as db:
+        rows=await db.execute(stmt)
+    logging.debug("получены данные работ студентов!")
+    return [row for row in rows]
 
 async def clean_for_next_year(date):
     """
