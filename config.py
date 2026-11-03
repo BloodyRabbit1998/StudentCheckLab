@@ -10,8 +10,27 @@ BOT_TOKEN=env["BOT_TOKEN"]
 FONT_NAME=env["FONT_NAME"]
 UPDATE_DATE=eval(env["UPDATE_DATE"])
 
-admins=env["ADMINS_ID"]
-if "," in admins:
-    ADMINS=list(map(int,admins.split(",")))
-else:
-    ADMINS=[int(admins)]
+def _parse_admins(raw: str | None) -> list[int]:
+    """Разбирает ADMINS_ID: допускает пробелы, запятые и точки с запятой."""
+    result = []
+    for part in (raw or "").replace(";", ",").split(","):
+        part = part.strip().strip('"').strip("'")
+        if not part:
+            continue
+        try:
+            result.append(int(part))
+        except ValueError:
+            raise ValueError(
+                f"Некорректный ID администратора в ADMINS_ID: {part!r}. "
+                "Ожидается число или несколько чисел через запятую."
+            ) from None
+
+    if not result:
+        raise ValueError(
+            "ADMINS_ID не задан или пуст. Укажите свой Telegram ID в .env "
+            "(его можно узнать командой /id в боте)."
+        )
+    return result
+
+
+ADMINS = _parse_admins(env.get("ADMINS_ID"))

@@ -16,8 +16,16 @@ TODO:
 async def main():
     await models.create_db()
     bot = Bot(token=config.BOT_TOKEN,default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-    dp=Dispatcher(storege=MemoryStorage())
+    dp=Dispatcher(storage=MemoryStorage())
     dp.include_routers(admin_router,student_router)
+
+    logging.info("Администраторы (ADMINS_ID): %s", config.ADMINS)
+    if bot.id in config.ADMINS:
+        logging.warning(
+            "ADMINS_ID содержит ID самого бота (%s). "
+            "Укажите свой Telegram ID — его можно узнать командой /id.",
+            bot.id,
+        )
 
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())

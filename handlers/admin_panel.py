@@ -41,8 +41,16 @@ class AdminFilter(BaseFilter):
     def __init__(self):
         super().__init__()
 
-    async def __call__(self, message: Message) -> bool:
-        result=message.from_user.id in ADMINS
+    async def __call__(self, event) -> bool:
+        user = getattr(event, "from_user", None)
+        user_id = user.id if user else None
+        result = user_id in ADMINS
+        if not result:
+            logging.debug(
+                "Доступ к админ-панели запрещён: user_id=%s, ADMINS=%s",
+                user_id,
+                ADMINS,
+            )
         return result
 @router.message(AdminFilter(),CommandStart())
 @router.message(AdminFilter(),Command('start'))
@@ -79,7 +87,7 @@ async def edir_table_status(msg:Message,state:FSMContext):
         await msg.answer("Вы вышли из режима изменения базы данных")
         await state.clear()
         await menu(msg,state)
-@router.message(AdminFilter(),Table.choice_table, ~F.text=="Архивация базы данных")
+@router.message(AdminFilter(),Table.choice_table)
 async def table(msg:Message,state:FSMContext):
     await state.update_data(choice_table=msg.text)
     kbs={"Работы":kb_admin_works,
@@ -95,7 +103,32 @@ async def table(msg:Message,state:FSMContext):
     Выберите что хотите сделать с таблицей в клавиатуре ниже!
                               """, reply_markup= kbs[msg.text])
         await state.set_state(Table.choice_operation)
-
+    elif msg.text=="Архивация базы данных":
+        now = datetime.datetime.now()
+        timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
+    
+        # SQL_URL вида sqlite+aiosqlite:///files/db.sqlite3 -> путь к файлу БД
+        db_rel_path = URL_SQL.split("///")[-1]
+        database_path = os.path.join(BASE_DIR, db_rel_path)
+        archive_dir = os.path.join(os.path.dirname(database_path), "db_archive")
+        archive_path = os.path.join(archive_dir, f"database_{timestamp}.db")
+    
+        try:
+            os.makedirs(archive_dir, exist_ok=True)
+            await asyncio.to_thread(shutil.copy2, database_path, archive_path)
+        except Exception as e:
+            logging.exception("Не удалось архивировать базу данных")
+            await msg.answer(f"Не удалось архивировать базу данных: {e}")
+            return
+    
+        display_path = os.path.relpath(archive_path, BASE_DIR)
+        msg_info=await msg.answer(f"База данных успешно архивирована в {display_path}\nОчищаем базу данных для следующего года...")
+        await db.clean_for_next_year(datetime.datetime(year=now.year, 
+                                                        month=UPDATE_DATE["month"], 
+                                                        day=UPDATE_DATE["day"]))
+        await msg_info.edit_text(f"База данных успешно архивирована в {display_path}\nБаза данных очищена для следующего года.")
+        
+    
 @router.message(AdminFilter(),Table.choice_operation)
 async def set_operation(msg:Message, state:FSMContext):
     await state.update_data(choice_operation=msg.text)
@@ -347,33 +380,6 @@ async def update_disc(call:types.CallbackQuery, state:FSMContext):
     await call.message.edit_text("Введите обновленное название дисциплины:", reply_markup=None)
     await state.set_state(Table.set_data)
 
-
-@router.message(AdminFilter(),F.text=="Архивация базы данных")
-async def archive_database(msg:Message):    
-    now = datetime.datetime.now()
-    timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
-
-    # SQL_URL вида sqlite+aiosqlite:///files/db.sqlite3 -> путь к файлу БД
-    db_rel_path = URL_SQL.split("///")[-1]
-    database_path = os.path.join(BASE_DIR, db_rel_path)
-    archive_dir = os.path.join(os.path.dirname(database_path), "db_archive")
-    archive_path = os.path.join(archive_dir, f"database_{timestamp}.db")
-
-    try:
-        os.makedirs(archive_dir, exist_ok=True)
-        await asyncio.to_thread(shutil.copy2, database_path, archive_path)
-    except Exception as e:
-        logging.exception("Не удалось архивировать базу данных")
-        await msg.answer(f"Не удалось архивировать базу данных: {e}")
-        return
-
-    display_path = os.path.relpath(archive_path, BASE_DIR)
-    msg_info=await msg.answer(f"База данных успешно архивирована в {display_path}\nОчищаем базу данных для следующего года...")
-    await db.clean_for_next_year(datetime.datetime(year=now.year, 
-                                                   month=UPDATE_DATE["month"], 
-                                                   day=UPDATE_DATE["day"]))
-    await msg_info.edit_text(f"База данных успешно архивирована в {display_path}\nБаза данных очищена для следующего года.")
-    
 
 """-------------------Проверка работ студентов------------------"""
 

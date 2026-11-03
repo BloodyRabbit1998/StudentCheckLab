@@ -3,6 +3,7 @@
 .env
 **/documents/*
 !files/documents/templates/*
+files/reports/*
 **/db.sqlite3
 __pycache__
 *.pyc
@@ -19,3 +20,7 @@ instance
 .mypy_cache
 .pytest_cache
 AVN*
+__pycache__/config.cpython-311.pyc
+__pycache__/config.cpython-311.pyc
+__pycache__/states.cpython-311.pyc
+handlers/__pycache__/admin_panel.cpython-311.pyc
